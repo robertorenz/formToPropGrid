@@ -9,8 +9,8 @@ wraps it, and the `ClaPropGrid` template set wires it into an ABC application.
 |---|---|---|
 | `PropGrid.inc` | class declaration + `PGT:` / `PGE:` / `PGS:` / `PGF:` / `PGC:` / `PGD:` equates | a redirection-path folder |
 | `PropGrid.clw` | class implementation + the `MAP` for `PROPGRID.DLL` | the same folder |
-| `ClaPropGrid.tpl` | template chain root (3 templates) | `C:\clarion12\template\win` |
-| `ClaPropGrid.tpw` | shared `#GROUP`s the `.tpl` includes | `C:\clarion12\template\win` |
+| `ClaPropGrid.tpl` | template chain root (3 templates) | `C:\clarion12\accessory\template\win` |
+| `ClaPropGrid.tpw` | shared `#GROUP`s the `.tpl` includes | same folder as the `.tpl` |
 | `..\src\propgrid.h` | the DLL's flat C API — reference only, nothing to install | — |
 
 Everything must be saved **ANSI** (no UTF-8 BOM) with **CRLF** line endings. A BOM breaks
@@ -60,15 +60,18 @@ attribute on the class does it.
 
 ## 4. Register the templates
 
-Both template files must live in `C:\clarion12\template\win` — the template parser resolves
-`#INCLUDE('ClaPropGrid.tpw')` against that folder only, so registering the `.tpl` from
-somewhere else fails with *"Could not open include file ClaPropGrid.tpw"*.
+Third-party templates belong in `C:\clarion12\accessory\template\win`. The one hard rule
+is that **`ClaPropGrid.tpw` must sit in the same folder as `ClaPropGrid.tpl`** — the
+template parser resolves `#INCLUDE('ClaPropGrid.tpw')` next to the `.tpl` being registered,
+and a missing neighbour fails with *"Could not open include file ClaPropGrid.tpw"*.
 
 ```
-copy ClaPropGrid.tpl  C:\clarion12\template\win\
-copy ClaPropGrid.tpw  C:\clarion12\template\win\
-"C:\clarion12\bin\ClarionCL.exe" -tr "C:\clarion12\template\win\ClaPropGrid.tpl"
+copy ClaPropGrid.tpl  C:\clarion12\accessory\template\win\
+copy ClaPropGrid.tpw  C:\clarion12\accessory\template\win\
+"C:\clarion12\bin\ClarionCL.exe" -tr "C:\clarion12\accessory\template\win\ClaPropGrid.tpl"
 ```
+
+(Registering from this location is verified working on Clarion 12.)
 
 Silence means success. Confirm with `ClarionCL -tl` (look for `ClaPropGrid`).
 
@@ -203,7 +206,7 @@ only a grouping name — binding is by `NAME()` plus `propgrid.lib`.
 
 ```
 :: template side
-ClarionCL -tr "C:\clarion12\template\win\ClaPropGrid.tpl"   :: parse check (silent = OK)
+ClarionCL -tr "C:\clarion12\accessory\template\win\ClaPropGrid.tpl"   :: parse check (silent = OK)
 ClarionCL -win -au -ax app.app out.txa                       :: export, edit the %prompts
 ClarionCL -win -au -ai app.app out.txa                       :: import
 ClarionCL -win -au -ag app.app                               :: GENERATE, then read the .clw
@@ -223,7 +226,7 @@ TXA gotcha worth writing down: a repeating `#BUTTON(...),MULTI(%list,%desc)` lis
 
 | Symptom | Cause |
 |---|---|
-| `Could not open include file ClaPropGrid.tpw` when registering | the `.tpw` is not in `C:\clarion12\template\win` |
+| `Could not open include file ClaPropGrid.tpw` when registering | the `.tpw` is not in the same folder as the `.tpl` being registered |
 | The new prompts do not appear | the IDE was open during `-tr`; restart it |
 | `Unresolved External PG_Create` | `propgrid.lib` missing from the project / linker path, or built with decorated names |
 | `Missing procedure definition: PG_CREATE(...)` | the `MODULE()` label in `PropGrid.clw` was changed back to `PROPGRID.DLL` |
