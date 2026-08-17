@@ -29,7 +29,19 @@ the Clarion AppGen through the `ClaPropGrid` template chain (ABC):
    template), loaded and saved by generated `PGFLoad:` / `PGFSave:`
    routines. Rows from all four sources — converted controls, lookups,
    added rows, OK/Cancel — merge into one header when their category
-   names match.
+   names match. Its **Tabs** tab handles multi-tab windows: each TAB's
+   text becomes its own category (lookup rows join the tab of their code
+   control), and a **Scan this window for tabs** button lists every tab
+   *and every control inside it*, each taggable **Convert into the grid**
+   or **Leave alone** — a tab holding a browse LIST is auto-detected and
+   left alone whole (list, buttons and all), staying a live tab next to
+   the grid, while tabs the conversion empties are hidden (the SHEET too,
+   once its last tab goes).
+
+The templates carry a version stamp (`v1.1 2026-08-16 23:05` in the
+registry description and on each template's General tab) — if the prompt
+dialog shows an older stamp than `clarion\ClaPropGrid.tpl`, the IDE is
+serving a stale parsed copy: close the IDE, re-copy, re-register.
 
 ![screenshot](docs/screenshot.png)
 

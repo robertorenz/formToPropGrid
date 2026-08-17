@@ -92,6 +92,17 @@ Codes                 STRING(2048)            ! 'A|B|C'   - written back
 Names                 STRING(4096)            ! 'Ape|Bee|Cat' - displayed
                     END
 
+!---- tab registry (see PropGridClass.BuildFromWindow) ----------------
+! One entry per TAB that has fed a row into the grid, or that
+! SetTabCategory pre-registered.  CatId is lazy: the category header is
+! only created when the first row actually lands under it, so a TAB
+! whose every control is excluded never shows an empty header.
+PropGridTabQueue  QUEUE,TYPE
+TabFeq              SIGNED                  ! the TAB control
+CatName             STRING(64)              ! '' = the TAB's own text
+CatId               SIGNED                  ! 0 = not created yet
+                  END
+
 PropGridClass CLASS,TYPE,MODULE('PropGrid.clw'),LINK('PropGrid.clw',_PropGridLinkMode_),DLL(_PropGridDllMode_)
 PG              LONG                          ! HPG handle (0 = dead)
 Win             &WINDOW                       ! owning Clarion window
@@ -108,7 +119,9 @@ TimerInterval   SIGNED                        ! forced on the window (0 = leave 
 MaxScanItems    SIGNED                        ! cap when enumerating a queue DROP
 NextPrompt      SIGNED                        ! label feq feeding the next AddControl
 PendingSyncFrom BYTE                          ! >0 = SyncFrom() in N more TakeEvent calls
+TabCategories   BYTE                          ! 1 = each TAB's text becomes a category
 Lookups         &PropGridLookupQueue,PRIVATE  ! AddFileDrop registry (NEW in Construct)
+Tabs            &PropGridTabQueue,PRIVATE     ! per-tab registry    (NEW in Construct)
 Construct       PROCEDURE()
 Destruct        PROCEDURE()
 !-- lifetime --
@@ -126,6 +139,8 @@ SetSplitter     PROCEDURE(SHORT px)
 !-- building --
 ClearAll        PROCEDURE()
 AddCategory     PROCEDURE(STRING catName),SIGNED,PROC
+SetTabCategory  PROCEDURE(SIGNED tabFeq, STRING catName)  ! rename the TAB's category
+TabCategoryOf   PROCEDURE(SIGNED feq),SIGNED,PROC ! category of the TAB holding feq (made on demand; 0 = none)
 AddProperty     PROCEDURE(SIGNED category, STRING propName, SHORT propType, STRING value),SIGNED,PROC
 SetChoices      PROCEDURE(SIGNED row, STRING choices)
 SetRange        PROCEDURE(SIGNED row, REAL low, REAL high, REAL step=1)
@@ -143,6 +158,7 @@ RowCount        PROCEDURE(),SIGNED
 !-- form conversion (runtime reflection) --
 AddControl      PROCEDURE(SIGNED feq, SIGNED category=0),SIGNED,PROC,VIRTUAL
 BuildFromWindow PROCEDURE(SIGNED category=0, <STRING excludeFeqs>),SIGNED,PROC,VIRTUAL
+TrimTabs        PROCEDURE(),VIRTUAL           ! hide TABs the conversion emptied - call AFTER the lookups are folded
 AddFileDrop     PROCEDURE(SIGNED category, STRING label, SIGNED codeFeq, SIGNED nameFeq, |
                           STRING codes, STRING names, <STRING description>),SIGNED,PROC,VIRTUAL
 PipeSafe        PROCEDURE(STRING txt),STRING  ! CLIP+LEFT, and '|' in data -> '/'
@@ -166,6 +182,11 @@ ListSelect      PROCEDURE(SIGNED feq, STRING val),BYTE,PROC,PRIVATE
 WriteControl    PROCEDURE(SIGNED feq, STRING val),PRIVATE
 PrevLabelFeq    PROCEDURE(SIGNED feq, SIGNED skipFeq),SIGNED,PRIVATE
 SetNameControl  PROCEDURE(SIGNED feq, STRING txt),PRIVATE
+IsExcluded      PROCEDURE(SIGNED feq, STRING excl),BYTE,PRIVATE  ! feq - or a container above it - in the list
+OwnerTab        PROCEDURE(SIGNED feq),SIGNED,PRIVATE             ! nearest TAB ancestor (0 = none)
+TabEntry        PROCEDURE(SIGNED tabFeq),PRIVATE                 ! fix SELF.Tabs on the entry, adding it if new
+TabCategory     PROCEDURE(SIGNED tabFeq, SIGNED fallback),SIGNED,PRIVATE ! the TAB's category, created on demand
+ContainerEmptied PROCEDURE(SIGNED feq),BYTE,PRIVATE              ! no visible control left inside
 !-- pipe-delimited list helpers (used by the lookup rows and by ListChoices) --
 PipeAppend      PROCEDURE(*STRING list, STRING value, SIGNED itemNo),PRIVATE
 PipeItem        PROCEDURE(STRING list, SIGNED ordinal),STRING,PRIVATE

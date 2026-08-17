@@ -95,7 +95,9 @@ PropGridClass.Construct PROCEDURE()
   SELF.MaxScanItems  = 500
   SELF.NextPrompt    = 0
   SELF.PendingSyncFrom = 0
+  SELF.TabCategories = 0
   SELF.Lookups      &= NEW(PropGridLookupQueue)
+  SELF.Tabs         &= NEW(PropGridTabQueue)
 
 PropGridClass.Destruct PROCEDURE()
   CODE
@@ -108,6 +110,11 @@ PropGridClass.Destruct PROCEDURE()
     FREE(SELF.Lookups)
     DISPOSE(SELF.Lookups)
     SELF.Lookups &= NULL
+  END
+  IF ~SELF.Tabs &= NULL
+    FREE(SELF.Tabs)
+    DISPOSE(SELF.Tabs)
+    SELF.Tabs &= NULL
   END
 
 !---------------------------------------------------------------------
@@ -250,8 +257,16 @@ PropGridClass.SetSplitter PROCEDURE(SHORT px)
 ! building
 !---------------------------------------------------------------------
 PropGridClass.ClearAll PROCEDURE()
+i SIGNED
   CODE
   IF ~SELF.Lookups &= NULL THEN FREE(SELF.Lookups).   ! the rows they describe are going
+  IF ~SELF.Tabs &= NULL                               ! the category ids die with the rows,
+    LOOP i = 1 TO RECORDS(SELF.Tabs)                  ! but the names / overrides survive
+      GET(SELF.Tabs, i)
+      SELF.Tabs.CatId = 0
+      PUT(SELF.Tabs)
+    END
+  END
   SELF.PendingSyncFrom = 0
   IF SELF.PG THEN PG_Clear(SELF.PG).
 
@@ -261,6 +276,34 @@ cName CSTRING(256)
   IF ~SELF.PG THEN RETURN 0.
   cName = CLIP(catName)
   RETURN PG_AddCategory(SELF.PG, cName)
+
+!---------------------------------------------------------------------
+! SetTabCategory - rename the category a TAB's controls will land in.
+! Works with TabCategories off too: an override always makes a category
+! for that one tab.  Call BEFORE BuildFromWindow.
+!---------------------------------------------------------------------
+PropGridClass.SetTabCategory PROCEDURE(SIGNED tabFeq, STRING catName)
+  CODE
+  IF ~tabFeq THEN RETURN.
+  SELF.TabEntry(tabFeq)
+  SELF.Tabs.CatName = catName
+  PUT(SELF.Tabs)
+
+!---------------------------------------------------------------------
+! TabCategoryOf - the category of the TAB that holds feq, creating it
+! on demand.  0 = feq is not inside a TAB, or tab categories are off
+! and no override was set - use your default category instead.
+!---------------------------------------------------------------------
+PropGridClass.TabCategoryOf PROCEDURE(SIGNED feq)
+tabFeq SIGNED
+cat    SIGNED
+  CODE
+  IF ~SELF.PG OR ~feq THEN RETURN 0.
+  SETTARGET(SELF.Win)
+  tabFeq = SELF.OwnerTab(feq)
+  cat    = CHOOSE(tabFeq <> 0, SELF.TabCategory(tabFeq, 0), 0)
+  SETTARGET()
+  RETURN cat
 
 PropGridClass.AddProperty PROCEDURE(SIGNED category, STRING propName, SHORT propType, STRING value)
 cName CSTRING(256)
@@ -451,7 +494,11 @@ ro    BYTE
 ! BuildFromWindow - walk every control on the window, convert the
 ! supported ones into grid rows and (optionally) hide the originals
 ! together with the PROMPT/STRING that labels them.
-! excludeFeqs = pipe-delimited list of FEQs to leave alone.
+! excludeFeqs = pipe-delimited list of FEQs to leave alone.  Excluding
+! a container (SHEET / TAB / GROUP / OPTION) excludes everything inside
+! it - that is how a whole browse tab stays alive.
+! With TabCategories on, each TAB's text names a category and the
+! rows land under their own tab's header (see TabCategory).
 !---------------------------------------------------------------------
 PropGridClass.BuildFromWindow PROCEDURE(SIGNED category=0, <STRING excludeFeqs>)
 feq        SIGNED
@@ -459,6 +506,8 @@ ctype      LONG
 row        SIGNED
 added      SIGNED
 labelFeq   SIGNED
+tabFeq     SIGNED
+cat        SIGNED
 excl       STRING(1024)
   CODE
   IF ~SELF.PG THEN RETURN 0.
@@ -474,9 +523,9 @@ excl       STRING(1024)
     ctype = feq{PROP:Type}
     IF ~ctype THEN CYCLE.
     IF feq = SELF.RegionFeq THEN CYCLE.
-    IF excl <> '' AND INSTRING('|' & feq & '|', excl, 1, 1)
-      labelFeq = 0                                 ! do NOT let the next control
-      CYCLE                                        ! steal (and hide) this one's prompt
+    IF SELF.IsExcluded(feq, excl)                  ! the control itself, or a
+      labelFeq = 0                                 ! container above it - do NOT let
+      CYCLE                                        ! the next control steal its prompt
     END
     IF feq{PROP:Hide} THEN CYCLE.
     CASE ctype
@@ -491,9 +540,12 @@ excl       STRING(1024)
          OROF CREATE:ole
       CYCLE
     END
+    cat    = category
+    tabFeq = SELF.OwnerTab(feq)
+    IF tabFeq THEN cat = SELF.TabCategory(tabFeq, category).
     SELF.NextPrompt = labelFeq
     SETTARGET()
-    row = SELF.AddControl(feq, category)
+    row = SELF.AddControl(feq, cat)
     SETTARGET(SELF.Win)
     IF row
       added += 1
@@ -507,6 +559,41 @@ excl       STRING(1024)
   SETTARGET()
   SELF.Redraw()
   RETURN added
+
+!---------------------------------------------------------------------
+! TrimTabs - hide every TAB the conversion emptied, and any SHEET
+! whose last visible TAB just went.  Call this AFTER the lookup trios
+! are folded (AddFileDrop hides its controls, so a tab that is nothing
+! but lookups only empties then) and after any manual hiding.
+!---------------------------------------------------------------------
+PropGridClass.TrimTabs PROCEDURE()
+feq  SIGNED
+i    SIGNED
+ch   SIGNED
+live BYTE
+  CODE
+  IF SELF.Win &= NULL THEN RETURN.
+  SETTARGET(SELF.Win)
+  LOOP feq = FIRSTFIELD() TO LASTFIELD()
+    IF feq{PROP:Type} = CREATE:tab AND ~feq{PROP:Hide}
+      IF SELF.ContainerEmptied(feq) THEN feq{PROP:Hide} = TRUE.
+    END
+  END
+  LOOP feq = FIRSTFIELD() TO LASTFIELD()
+    IF feq{PROP:Type} = CREATE:sheet AND ~feq{PROP:Hide}
+      live = 0
+      LOOP i = 1 TO 512
+        ch = feq{PROP:Child, i}
+        IF ~ch THEN BREAK.
+        IF ch{PROP:Type} = CREATE:tab AND ~ch{PROP:Hide}
+          live = 1
+          BREAK
+        END
+      END
+      IF ~live THEN feq{PROP:Hide} = TRUE.
+    END
+  END
+  SETTARGET()
 
 !---------------------------------------------------------------------
 ! AddFileDrop - fold a "lookup trio" (code ENTRY + '...' BUTTON +
@@ -772,7 +859,7 @@ p   SIGNED
     CASE feq{PROP:Type}
     OF CREATE:check OROF CREATE:state3 OROF CREATE:button OROF CREATE:radio |
          OROF CREATE:option OROF CREATE:group OROF CREATE:prompt            |
-         OROF CREATE:string OROF CREATE:sstring
+         OROF CREATE:string OROF CREATE:sstring OROF CREATE:tab
       txt = feq{PROP:Text}                        ! a real caption, not a picture
     END
   END
@@ -961,6 +1048,83 @@ want STRING(256)
   OF CREATE:string OROF CREATE:sstring OROF CREATE:prompt
     feq{PROP:Text} = CLIP(want)
   END
+
+!---------------------------------------------------------------------
+! tab helpers (all assume SETTARGET(SELF.Win) is active)
+!---------------------------------------------------------------------
+! IsExcluded - feq, or any container above it, is in the exclude list.
+! The parent walk is what makes "exclude the TAB" spare its children.
+PropGridClass.IsExcluded PROCEDURE(SIGNED feq, STRING excl)
+p SIGNED
+  CODE
+  IF excl = '' THEN RETURN 0.
+  p = feq
+  LOOP WHILE p
+    IF INSTRING('|' & p & '|', excl, 1, 1) THEN RETURN 1.
+    p = p{PROP:Parent}
+  END
+  RETURN 0
+
+PropGridClass.OwnerTab PROCEDURE(SIGNED feq)
+p SIGNED
+  CODE
+  p = feq{PROP:Parent}
+  LOOP WHILE p
+    IF p{PROP:Type} = CREATE:tab THEN RETURN p.
+    p = p{PROP:Parent}
+  END
+  RETURN 0
+
+PropGridClass.TabEntry PROCEDURE(SIGNED tabFeq)
+i SIGNED
+  CODE
+  LOOP i = 1 TO RECORDS(SELF.Tabs)
+    GET(SELF.Tabs, i)
+    IF SELF.Tabs.TabFeq = tabFeq THEN RETURN.
+  END
+  CLEAR(SELF.Tabs)
+  SELF.Tabs.TabFeq = tabFeq
+  ADD(SELF.Tabs)                                   ! the buffer stays on the new entry
+
+! TabCategory - the category id for a TAB, created the first time a row
+! wants it.  An explicit SetTabCategory name always wins; otherwise the
+! TAB's own text - but only when TabCategories is on.  fallback = the
+! caller's default category.
+PropGridClass.TabCategory PROCEDURE(SIGNED tabFeq, SIGNED fallback)
+nm STRING(256)
+  CODE
+  SELF.TabEntry(tabFeq)
+  IF SELF.Tabs.CatId THEN RETURN SELF.Tabs.CatId.
+  IF SELF.Tabs.CatName <> ''
+    nm = SELF.Tabs.CatName
+  ELSIF SELF.TabCategories
+    nm = SELF.ControlLabel(tabFeq, 0)              ! the TAB's text, ampersands stripped
+  ELSE
+    RETURN fallback
+  END
+  IF CLIP(nm) = '' THEN RETURN fallback.
+  SELF.Tabs.CatId = SELF.AddCategory(CLIP(nm))
+  PUT(SELF.Tabs)
+  RETURN SELF.Tabs.CatId
+
+! ContainerEmptied - nothing visible is left inside: every child is
+! hidden, or is itself a container with nothing visible inside it.
+PropGridClass.ContainerEmptied PROCEDURE(SIGNED feq)
+i  SIGNED
+ch SIGNED
+  CODE
+  LOOP i = 1 TO 512
+    ch = feq{PROP:Child, i}
+    IF ~ch THEN BREAK.
+    IF ch{PROP:Hide} THEN CYCLE.
+    CASE ch{PROP:Type}
+    OF CREATE:group OROF CREATE:option OROF CREATE:sheet OROF CREATE:tab
+      IF ~SELF.ContainerEmptied(ch) THEN RETURN 0.
+    ELSE
+      RETURN 0                                     ! a live control - keep the tab
+    END
+  END
+  RETURN 1
 
 !---------------------------------------------------------------------
 ! pipe-delimited list helpers

@@ -2,6 +2,13 @@
 #!  ClaPropGrid.tpw  -  shared #GROUPs for the ClaPropGrid template set.
 #!  #INCLUDEd from ClaPropGrid.tpl.  Nothing but #GROUPs lives in here, and
 #!  a #GROUP has no end marker, so this file must contain NO #AT / #EMBED.
+#!
+#!  Part of the ClaPropGrid chain - the version stamp for the whole chain
+#!  lives at the top of ClaPropGrid.tpl and is bumped on EVERY edit, this
+#!  file included.  A #GROUP here can only be #INSERTed / %()-called from
+#!  the .tpl; a #GROUP in this file that reads the CALLING template's own
+#!  symbols has been measured to come back empty, which is why the two
+#!  prompt-time window scans (%PGScanLookups, %PGScanTabs) live in the .tpl.
 #!=============================================================================
 #!
 #!-----------------------------------------------------------------------------

@@ -179,6 +179,37 @@ unchanged.
 On the OK button's `EVENT:Accepted` (embedded early, PRIORITY 2000, ahead of the generated
 form logic at 4999) the template emits `Obj.SyncBack()` unless Live sync is on.
 
+#### Multi-tab windows → categories (the *Tabs* tab)
+
+A window with a SHEET converts per tab:
+
+* **Tab names become extra categories** (default on): every converted control lands under a
+  category named after its TAB's text (ampersands stripped) instead of one flat default
+  category. The category is created lazily, when its first row arrives — a tab that
+  contributes nothing never shows an empty header. Controls outside any TAB (OK/Cancel…)
+  stay in the default category.
+* **The Tabs list** holds one entry per TAB you want to control: *Convert into the grid*
+  (optionally under a renamed category) or **Leave alone** — the whole tab is skipped,
+  nothing inside it is converted or hidden, and it keeps working exactly as before. That is
+  the right choice for a tab holding a **browse LIST and its Insert/Change/Delete buttons**:
+  a browse is not a name/value pair, so it stays a real tab next to the grid. A tab that is
+  not listed at all is converted.
+* **Scan this window for tabs** prefills the list — a tab containing a plain (non-drop)
+  LIST is assumed to be a browse and prefilled as *Leave alone*; everything else as
+  *Convert*. Re-scanning never duplicates entries.
+* **Hide tabs the conversion empties** (default on): after the build (and after the lookup
+  trios are folded — a tab that is nothing but lookups only empties then) every TAB with
+  nothing visible left inside is hidden, and a SHEET whose last visible tab went is hidden
+  with it. A control spared via *Controls to leave alone* keeps its tab (and the sheet)
+  visible.
+
+Under the hood, all of it is plain class API — available to hand-coded windows too:
+`Obj.TabCategories = 1`, `Obj.SetTabCategory(?Tab,'Name')` (before `BuildFromWindow`),
+excluding a **container** FEQ (SHEET/TAB/GROUP/OPTION) in `BuildFromWindow`'s exclude list
+skips its whole subtree, `Obj.TabCategoryOf(?AnyControl)` returns/creates the category of
+the tab holding a control, and `Obj.TrimTabs()` does the hiding — call it **after** the
+last `AddFileDrop`.
+
 #### Lookup trios → one drop-down row (the *Lookups* tab)
 
 The classic Clarion lookup is three controls — `ENTRY(@s3),USE(CUS:DeptCode)`, a `'...'`

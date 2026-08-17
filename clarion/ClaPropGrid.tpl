@@ -1,4 +1,4 @@
-#TEMPLATE(ClaPropGrid,'Direct2D Property Grid'),FAMILY('ABC')
+#TEMPLATE(ClaPropGrid,'Direct2D Property Grid [v1.1 2026-08-16 23:05]'),FAMILY('ABC')
 #!=============================================================================
 #!  ClaPropGrid  -  a Direct2D property grid for Clarion 12 (32-bit).
 #!
@@ -29,7 +29,24 @@
 #!  and put propgrid.dll beside the EXE, propgrid.lib where the linker finds
 #!  it.  See INSTALL.md.
 #!
-#!  build 2026-08-16a
+#!  VERSION 1.1  -  2026-08-16 23:05
+#!
+#!  VERSION STAMP - THE CONVENTION.  Every edit to this chain bumps the
+#!  version and refreshes the timestamp, because the #1 support symptom in
+#!  this project is the IDE serving a STALE PARSED COPY of the template out
+#!  of the registry (see INSTALL.md section 8).  With the stamp on screen you
+#!  can tell at a glance whether the prompts you are looking at came from the
+#!  file you just edited: if the version in the prompt sheet is not the one
+#!  below, close the IDE, re-run ClarionCL -tr, reopen.
+#!
+#!  The template language cannot single-source it - the #TEMPLATE description
+#!  is read at REGISTRATION time, long before any #GROUP can run - so the
+#!  string is a literal in FIVE places and they must be kept in step:
+#!      1. this comment
+#!      2. the #TEMPLATE(...) description line above
+#!      3. #DISPLAY on PropGridGlobal      -> General tab
+#!      4. #DISPLAY on PropertyGridControl -> General tab
+#!      5. #DISPLAY on FormToPropertyGrid  -> General tab
 #!=============================================================================
 #!#############################################################################
 #!  APPLICATION EXTENSION - PropGridGlobal
@@ -38,7 +55,7 @@
 #SHEET
   #TAB('&General')
     #BOXED('ClaPropGrid')
-      #DISPLAY('Direct2D Property Grid - build 2026-08-16a')
+      #DISPLAY('Version 1.1 - updated 2026-08-16 23:05')
       #DISPLAY('')
       #DISPLAY('Add this extension ONCE, at the application level.  It places')
       #DISPLAY('PropGridClass in the build (ABC class category PROPGRID) and')
@@ -83,6 +100,8 @@ INCLUDE('PropGrid.inc'),ONCE
   END
 #SHEET
   #TAB('&General')
+    #DISPLAY('Version 1.1 - updated 2026-08-16 23:05')
+    #DISPLAY('')
     #BOXED('Object')
       #PROMPT('&Disable this property grid',CHECK),%PGDisable,DEFAULT(0),AT(10)
       #PROMPT('&Object name:',@s64),%PGObject,REQ,DEFAULT('PropGrid' & %ActiveTemplateInstance)
@@ -307,6 +326,8 @@ PGSave:%PGObject ROUTINE
 #EXTENSION(FormToPropertyGrid,'Convert form controls to a Property Grid'),PROCEDURE,HLP('~ClaPropGrid.htm')
 #SHEET
   #TAB('&General')
+    #DISPLAY('Version 1.1 - updated 2026-08-16 23:05')
+    #DISPLAY('')
     #BOXED('Object')
       #PROMPT('&Disable this template',CHECK),%F2PDisable,DEFAULT(0),AT(10)
       #PROMPT('&Object name:',@s64),%F2PObject,REQ,DEFAULT('FormGrid' & %ActiveTemplateInstance)
@@ -338,6 +359,57 @@ PGSave:%PGObject ROUTINE
       #DISPLAY('it is neither converted into a row nor hidden.')
       #BUTTON('E&xclude controls'),MULTI(%F2PExclude,%F2PExcludeCtl),INLINE
         #PROMPT('&Control:',CONTROL),%F2PExcludeCtl,REQ
+      #ENDBUTTON
+    #ENDBOXED
+  #ENDTAB
+  #TAB('&Tabs')
+    #BOXED('Tab handling')
+      #DISPLAY('Every TAB is either CONVERTED - the controls on it become grid')
+      #DISPLAY('rows under a category named after the tab - or LEFT ALONE, in')
+      #DISPLAY('which case the tab and everything inside it is not touched at')
+      #DISPLAY('all and keeps working exactly as it does now.  "Leave alone" is')
+      #DISPLAY('the right answer for a tab that holds a browse LIST with its')
+      #DISPLAY('Insert / Change / Delete buttons.')
+      #DISPLAY('')
+      #DISPLAY('A tab that is NOT in the conversion list below converts whole.')
+      #PROMPT('Tab names become extra &categories',CHECK),%F2PTabCats,DEFAULT(1),AT(10)
+      #PROMPT('&Hide tabs the conversion empties (and the sheet, when every tab goes)',CHECK),%F2PTrimTabs,DEFAULT(1),AT(10)
+    #ENDBOXED
+    #BOXED('Find them for me')
+      #DISPLAY('The scan fills the conversion list with every TAB on this window')
+      #DISPLAY('and, indented under each tab that converts, every control on it')
+      #DISPLAY('that BuildFromWindow would turn into a row.  Tag ANY line -')
+      #DISPLAY('a tab or a single control - "Leave alone" to keep it working')
+      #DISPLAY('untouched; a spared control keeps its tab visible.')
+      #DISPLAY('')
+      #DISPLAY('A tab holding a LIST that has no DROP attribute (i.e. a browse,')
+      #DISPLAY('not a drop-down) is prefilled "Leave alone" and its controls are')
+      #DISPLAY('NOT listed - the tab entry already covers them.  Flip it to')
+      #DISPLAY('"Convert into the grid" and scan again to list them.')
+      #DISPLAY('')
+      #DISPLAY('Scanning only APPENDS what is missing: nothing is added twice')
+      #DISPLAY('and nothing you edited is overwritten, so re-scanning after you')
+      #DISPLAY('change the window is always safe.')
+      #BUTTON('&Scan this window for tabs and controls'),WHENACCEPTED(%PGScanTabs())
+      #ENDBUTTON
+      #PROMPT('Last scan:',@s64),%F2PTabScanInfo
+    #ENDBOXED
+    #BOXED('Conversion list')
+      #DISPLAY('"TAB ?x" is a tab, an indented "- ?y" is one control inside the')
+      #DISPLAY('tab above it.  Category name applies to TAB lines only.')
+      #DISPLAY('Behaviour -> "Controls to leave alone" still works too: both')
+      #DISPLAY('lists feed the same exclusion.')
+      #BUTTON('Conversion &list...'),MULTI(%F2PTab,CHOOSE(%F2PTabKind = 'CONTROL','      - ','TAB ') & %F2PTabCtl & '  ->  ' & CHOOSE(%F2PTabAction = 'Leave alone','Leave alone','Convert')),INLINE
+        #PROMPT('&Tab or control:',CONTROL),%F2PTabCtl,REQ
+        #PROMPT('&What to do:',DROP('Convert into the grid|Leave alone')),%F2PTabAction,DEFAULT('Convert into the grid')
+        #PROMPT('Cate&gory name (tabs only; blank = the tab''s text):',@s64),%F2PTabCat
+        #! %F2PTabKind is written by the scan and never shown: a zero sized
+        #! #BOXED,WHERE(%False) is the shipped way to carry a hidden child on
+        #! a repeating list (ado.tpw:1715).  It defaults to TAB so that a row
+        #! you add by hand still honours the Category name.
+        #BOXED,WHERE(%False),AT(0,0,0,0)
+          #PROMPT('Kind',@s8),%F2PTabKind,DEFAULT('TAB')
+        #ENDBOXED
       #ENDBUTTON
     #ENDBOXED
   #ENDTAB
@@ -459,6 +531,7 @@ PGSave:%PGObject ROUTINE
   #DECLARE(%F2PLNo)
   #DECLARE(%F2PLCatNo)
   #DECLARE(%F2PLCatVar)
+  #DECLARE(%F2PLTabCat)
   #DECLARE(%F2PLNameCtl)
   #DECLARE(%F2PAddNo)
   #DECLARE(%F2PAddPic)
@@ -542,6 +615,9 @@ PGFCanRow:%ActiveTemplateInstance LONG
   #IF(ITEMS(%F2PLookup))
 PGFLCnt:%ActiveTemplateInstance  SIGNED                          ! records taken from the lookup file
 PGFLBuf:%ActiveTemplateInstance  USHORT                          ! ABC SaveBuffer handle (the scan is side effect free)
+    #IF(%F2PTabCats)
+PGFTCat:%ActiveTemplateInstance  LONG                            ! TabCategoryOf() result for a lookup row
+    #ENDIF
   #ENDIF
   #FOR(%F2PLCats)
     #SET(%F2PLCatNo,INSTANCE(%F2PLCats))
@@ -563,6 +639,14 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
   %F2PObject.LiveSync      = %F2PLiveSync
   %F2PObject.HideOriginals = %F2PHide
   %F2PObject.TimerInterval = %F2PTimer
+  #! a plain literal, never the raw prompt: an app saved by an OLDER build of
+  #! this template has no value stored for %F2PTabCats, and an empty right
+  #! hand side would not compile.
+  #IF(%F2PTabCats)
+  %F2PObject.TabCategories = 1                                    ! each TAB's text becomes a category
+  #ELSE
+  %F2PObject.TabCategories = 0                                    ! everything lands in the default category
+  #ENDIF
   DO PGPlace:%F2PObject                                           ! creates the grid
   IF %F2PObject.Initialized
   #INSERT(%PGEmitAppearance,%F2PObject)
@@ -570,6 +654,15 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
   #FOR(%F2PExclude)
     #IF(%F2PExcludeCtl)
     PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PExcludeCtl
+    #ENDIF
+  #ENDFOR
+  #! the conversion list - tabs AND single controls, the same treatment for
+  #! both because BuildFromWindow excludes SUBTREES: a TAB's own FEQ in the
+  #! list leaves every control inside it untouched, a control's FEQ just that
+  #! control.  Merges into the same string as the Behaviour exclude list.
+  #FOR(%F2PTab),WHERE(%F2PTabAction = 'Leave alone')
+    #IF(%F2PTabCtl)
+    PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PTabCtl
     #ENDIF
   #ENDFOR
   #IF(%F2POkCtl)
@@ -591,6 +684,15 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
     PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PLookupDesc
     #ENDIF
   #ENDFOR
+  #! per tab category names.  SetTabCategory only records the override, so it
+  #! must run BEFORE BuildFromWindow; it works with tab categories switched
+  #! off too, which is why it is not guarded by %F2PTabCats.  TAB lines of the
+  #! conversion list only - the Category prompt is ignored on control lines.
+  #FOR(%F2PTab),WHERE(%F2PTabCat AND %F2PTabAction <> 'Leave alone' AND %F2PTabKind <> 'CONTROL')
+    #IF(%F2PTabCtl)
+    %F2PObject.SetTabCategory(%F2PTabCtl,'%F2PTabCat')            ! instead of the tab's own text
+    #ENDIF
+  #ENDFOR
     PGFCat:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PCategory')
   #IF(%F2PActEarly)
     PGFAct:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PActionCat') ! a lookup / added row asked for this one by name
@@ -607,6 +709,7 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
     #! which come back empty from inside this loop.
     #SET(%F2PLCatVar,'PGFCat:' & %ActiveTemplateInstance)
     #SET(%F2PLCatNo,0)
+    #SET(%F2PLTabCat,0)
     #IF(%F2PLookupCat)
       #SET(%F2PLCatNo,INLIST(%F2PLookupCat,%F2PLCats))
     #ENDIF
@@ -614,6 +717,12 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
       #SET(%F2PLCatVar,'PGFLCat:' & %ActiveTemplateInstance & ':' & %F2PLCatNo)
     #ELSIF(%F2PActEarly AND %F2PLookupCat AND UPPER(%F2PLookupCat) = UPPER(%F2PActionCat))
       #SET(%F2PLCatVar,'PGFAct:' & %ActiveTemplateInstance)
+    #ELSIF(%F2PTabCats AND %F2PLookupCat = '')
+      #! no category named, and tab categories are on: the row belongs on the
+      #! tab its code control sits on.  Resolved at RUN time (TabCategoryOf
+      #! makes the category on demand) with the default category as fallback.
+      #SET(%F2PLCatVar,'PGFTCat:' & %ActiveTemplateInstance)
+      #SET(%F2PLTabCat,1)
     #ENDIF
     #SET(%F2PLNameCtl,'0')
     #IF(%F2PLookupDesc)
@@ -646,6 +755,10 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
     END
     Access:%F2PLookupFile.RestoreBuffer(PGFLBuf:%ActiveTemplateInstance)
     Relate:%F2PLookupFile.Close()
+    #IF(%F2PLTabCat)
+    PGFTCat:%ActiveTemplateInstance = %F2PObject.TabCategoryOf(%F2PLookupCode) ! the tab this lookup sits on
+    IF ~PGFTCat:%ActiveTemplateInstance THEN PGFTCat:%ActiveTemplateInstance = PGFCat:%ActiveTemplateInstance.
+    #ENDIF
     PGFLRow:%ActiveTemplateInstance:%F2PLNo = %F2PObject.AddFileDrop(%F2PLCatVar,'%F2PLookupLabel',%F2PLookupCode,%F2PLNameCtl,CLIP(PGFLCode:%ActiveTemplateInstance:%F2PLNo),CLIP(PGFLName:%ActiveTemplateInstance:%F2PLNo),'%F2PLookupTip')
     #IF(%F2PLookupBtn)
     HIDE(%F2PLookupBtn)                                           ! the drop row replaces the browse
@@ -716,6 +829,12 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
     #ENDIF
   #ENDIF
     #EMBED(%F2PAfterBuild,'ClaPropGrid (form): after the grid is built (add your own rows here)'),%ActiveTemplateInstance
+  #! LAST, after BuildFromWindow, after every AddFileDrop (each of which hides
+  #! its own trio) and after the embed above - so a control you UNHIDE there
+  #! still keeps its tab on screen.
+  #IF(%F2PTrimTabs)
+    %F2PObject.TrimTabs()                                         ! hide the tabs the conversion emptied
+  #ENDIF
     %F2PObject.Redraw()
   END
 #ENDAT
@@ -1148,6 +1267,210 @@ PGFSave:%F2PObject ROUTINE
   #ENDIF
 #ENDFOR
 #SET(%F2PScanInfo,'added ' & %pgAdded & ', already listed ' & %pgSkipped & ', could not identify ' & %pgUnres)
+#!=============================================================================
+#!  %PGScanTabs - fill the CONVERSION LIST from what is on the window: one
+#!  entry per TAB and, indented under every tab that converts, one entry per
+#!  control on it that BuildFromWindow would turn into a row.
+#!
+#!  Runs at PROMPT time, from the "Scan this window for tabs and controls"
+#!  button, and it lives HERE and not in ClaPropGrid.tpw for the same reason
+#!  %PGScanLookups does: a #GROUP in the included file that reads THIS
+#!  template's symbols (%F2PTab and its children) has been measured to come
+#!  back empty.
+#!
+#!  Prefilled action.  A tab holding a browse is left alone, everything else
+#!  converts.  "Is this LIST a browse" is the shipped test from
+#!  CONTROL.TPW:209 - a LIST with no DROP attribute.  DROP's parameter is a
+#!  row count, so a QUOTED one really came from DROPID('Majors') on a drag
+#!  and drop browse and still means "not a drop-down".
+#!  %ControlUnsplitStatement, not %ControlStatement: a LIST with a long FORMAT
+#!  is split over continuation lines and the attribute can land on any of them.
+#!
+#!  Convertible control types - exactly the ones PropGridClass.AddControl
+#!  turns into a row (PropGrid.clw:418-473):
+#!      ENTRY  SPIN  SLIDER  CHECK  OPTION  TEXT  RTF  BUTTON
+#!      LIST / COMBO that HAVE a DROP attribute (and the DROPLIST /
+#!      DROPCOMBO types, which some window formatters report instead)
+#!  PROMPT / STRING become the LABEL of the next control, never a row of
+#!  their own (PropGrid.clw:532), so they are never listed; nor are the
+#!  controls of a tab that is left alone - its one entry covers them.
+#!
+#!  Containment is resolved by walking %ControlParent up from the control
+#!  until a TAB turns up, so a control inside a GROUP inside a TAB is still
+#!  found.  The walk uses #FIX(%Control,..) and therefore cannot run inside
+#!  #FOR(%Control) - hence the passes, exactly as %PGScanLookups is built.
+#!  Two private lists, never one: %pgCand is every candidate IN WINDOW ORDER
+#!  (that order is what puts each control under its own tab), %pgTab is the
+#!  per tab state.  A #FOR over a list cannot be nested inside a #FOR over
+#!  the SAME list, and pass 4 has to read tab state while walking candidates.
+#!=============================================================================
+#GROUP(%PGScanTabs),PRESERVE,AUTO
+#DECLARE(%pgCand),MULTI
+#DECLARE(%pgCandCtl,%pgCand)
+#DECLARE(%pgCandKind,%pgCand)                       #! TAB | CONTROL | BROWSE
+#DECLARE(%pgCandOwner,%pgCand)                      #! the TAB it sits on
+#DECLARE(%pgTab),MULTI
+#DECLARE(%pgTabCtl,%pgTab)
+#DECLARE(%pgTabBrowse,%pgTab)
+#DECLARE(%pgTabAct,%pgTab)
+#DECLARE(%pgTxt)
+#DECLARE(%pgKind)
+#DECLARE(%pgWalk)
+#DECLARE(%pgFound)
+#DECLARE(%pgStep)
+#DECLARE(%pgAct)
+#DECLARE(%pgSeen)
+#DECLARE(%pgAddedTabs)
+#DECLARE(%pgAddedCtls)
+#DECLARE(%pgSkipped)
+#DECLARE(%pgLeave)
+#FREE(%pgCand)
+#FREE(%pgTab)
+#SET(%pgAddedTabs,0)
+#SET(%pgAddedCtls,0)
+#SET(%pgSkipped,0)
+#SET(%pgLeave,0)
+#!---- pass 1: every candidate, in window order -------------------------------
+#FOR(%Control)
+  #SET(%pgKind,'')
+  #CASE(%ControlType)
+  #OF('TAB')
+    #SET(%pgKind,'TAB')
+  #OF('LIST')
+  #OROF('COMBO')
+    #SET(%pgTxt,'')
+    #IF(VAREXISTS(%ControlUnsplitStatement))
+      #SET(%pgTxt,EXTRACT(%ControlUnsplitStatement,'DROP',1))
+    #ELSE
+      #SET(%pgTxt,EXTRACT(%ControlStatement,'DROP',1))
+    #ENDIF
+    #IF(%pgTxt = '' OR SUB(%pgTxt,1,1) = '<39>')    #! nothing but DROP(rows) counts
+      #IF(%ControlType = 'LIST')
+        #SET(%pgKind,'BROWSE')                      #! marks its tab, never listed
+      #ENDIF
+    #ELSE
+      #SET(%pgKind,'CONTROL')                       #! a real drop-down = a row
+    #ENDIF
+  #OF('DROPLIST')
+  #OROF('DROPCOMBO')
+    #SET(%pgKind,'CONTROL')                         #! already a drop-down by type
+  #OF('ENTRY')
+  #OROF('SPIN')
+  #OROF('SLIDER')
+  #OROF('CHECK')
+  #OROF('OPTION')
+  #OROF('TEXT')
+  #OROF('RTF')
+  #OROF('BUTTON')
+    #SET(%pgKind,'CONTROL')
+  #ENDCASE
+  #IF(%pgKind AND %Control)
+    #ADD(%pgCand,ITEMS(%pgCand) + 1)                #! the new entry is now current
+    #SET(%pgCandCtl,%Control)
+    #SET(%pgCandKind,%pgKind)
+    #SET(%pgCandOwner,'')
+    #IF(%pgKind = 'TAB')
+      #ADD(%pgTab,ITEMS(%pgTab) + 1)
+      #SET(%pgTabCtl,%Control)
+      #SET(%pgTabBrowse,0)
+      #SET(%pgTabAct,'')
+    #ENDIF
+  #ENDIF
+#ENDFOR
+#!---- pass 2: which TAB holds each control -----------------------------------
+#FOR(%pgCand),WHERE(%pgCandKind <> 'TAB')
+  #SET(%pgWalk,%pgCandCtl)
+  #SET(%pgFound,'')
+  #FIX(%Control,%pgWalk)
+  #IF(UPPER(%Control) = UPPER(%pgWalk))             #! a miss leaves the old fix in place
+    #LOOP,FOR(%pgStep,1,16)                         #! bounded - a cycle can never hang AppGen
+      #SET(%pgWalk,%ControlParent)
+      #IF(%pgWalk = '')
+        #BREAK
+      #ENDIF
+      #FIX(%Control,%pgWalk)
+      #IF(UPPER(%Control) <> UPPER(%pgWalk))
+        #BREAK
+      #ENDIF
+      #IF(%ControlType = 'TAB')
+        #SET(%pgFound,%Control)
+        #BREAK
+      #ENDIF
+    #ENDLOOP
+  #ENDIF
+  #SET(%pgCandOwner,%pgFound)
+  #IF(%pgFound AND %pgCandKind = 'BROWSE')
+    #FOR(%pgTab),WHERE(UPPER(%pgTabCtl) = UPPER(%pgFound))
+      #SET(%pgTabBrowse,1)
+      #BREAK
+    #ENDFOR
+  #ENDIF
+#ENDFOR
+#!---- pass 3: what each tab is going to do -----------------------------------
+#!  A tab already in the list keeps ITS action - the developer's word beats
+#!  the browse heuristic, and that is what makes a re-scan safe.
+#FOR(%pgTab)
+  #SET(%pgAct,'')
+  #FOR(%F2PTab),WHERE(UPPER(%F2PTabCtl) = UPPER(%pgTabCtl))
+    #SET(%pgAct,%F2PTabAction)
+    #BREAK
+  #ENDFOR
+  #IF(%pgAct = '')
+    #IF(%pgTabBrowse)
+      #SET(%pgAct,'Leave alone')
+    #ELSE
+      #SET(%pgAct,'Convert into the grid')
+    #ENDIF
+  #ENDIF
+  #SET(%pgTabAct,%pgAct)
+#ENDFOR
+#!---- pass 4: append what is missing, in window order ------------------------
+#SET(%pgSeen,'')
+#FOR(%F2PTab)
+  #SET(%pgSeen,%pgSeen & '|' & UPPER(%F2PTabCtl) & '|')
+#ENDFOR
+#FOR(%pgCand),WHERE(%pgCandKind <> 'BROWSE')
+  #SET(%pgAct,'')
+  #IF(%pgCandKind = 'TAB')
+    #FOR(%pgTab),WHERE(UPPER(%pgTabCtl) = UPPER(%pgCandCtl))
+      #SET(%pgAct,%pgTabAct)
+      #BREAK
+    #ENDFOR
+  #ELSIF(%pgCandOwner)
+    #!  a control is listed only when the tab it lives on converts: the entry
+    #!  of a tab that is left alone already covers everything inside it.
+    #FOR(%pgTab),WHERE(UPPER(%pgTabCtl) = UPPER(%pgCandOwner))
+      #IF(%pgTabAct <> 'Leave alone')
+        #SET(%pgAct,'Convert into the grid')
+      #ENDIF
+      #BREAK
+    #ENDFOR
+  #ENDIF
+  #!  a blank action here means "do not list it": the control is on no tab at
+  #!  all (Behaviour -> "Controls to leave alone" is the place for those), or
+  #!  the tab it lives on is left alone.
+  #IF(%pgAct)
+    #IF(INSTRING('|' & UPPER(%pgCandCtl) & '|',%pgSeen,1,1))
+      #SET(%pgSkipped,%pgSkipped + 1)               #! already listed - never touched again
+    #ELSE
+      #ADD(%F2PTab,ITEMS(%F2PTab) + 1)
+      #SET(%F2PTabCtl,%pgCandCtl)
+      #SET(%F2PTabKind,%pgCandKind)
+      #SET(%F2PTabAction,%pgAct)
+      #SET(%F2PTabCat,'')
+      #SET(%pgSeen,%pgSeen & '|' & UPPER(%pgCandCtl) & '|')
+      #IF(%pgCandKind = 'TAB')
+        #SET(%pgAddedTabs,%pgAddedTabs + 1)
+      #ELSE
+        #SET(%pgAddedCtls,%pgAddedCtls + 1)
+      #ENDIF
+      #IF(%pgAct = 'Leave alone')
+        #SET(%pgLeave,%pgLeave + 1)
+      #ENDIF
+    #ENDIF
+  #ENDIF
+#ENDFOR
+#SET(%F2PTabScanInfo,'added ' & %pgAddedTabs & ' tabs + ' & %pgAddedCtls & ' controls (' & %pgLeave & ' left alone), already listed ' & %pgSkipped)
 #!=============================================================================
 #!  Shared #GROUPs.  A #GROUP has no end marker and swallows everything after
 #!  it, so every #AT / #EMBED above must come FIRST - hence the include here,
