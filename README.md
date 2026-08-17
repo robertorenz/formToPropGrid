@@ -21,7 +21,13 @@ the Clarion AppGen through the `ClaPropGrid` template chain (ABC):
    `'...'` **BUTTON** + description `STRING` — into **one drop-down row
    that shows the description and writes the code back**, filled from the
    lookup table at window-open time. Lookups you leave as buttons still
-   work, and the grid now refreshes itself after the browse closes.
+   work, and the grid now refreshes itself after the browse closes. Its
+   **Added rows** tab adds rows for variables or table columns that have
+   **no control on the window at all** (same field list as the control
+   template), loaded and saved by generated `PGFLoad:` / `PGFSave:`
+   routines. Rows from all four sources — converted controls, lookups,
+   added rows, OK/Cancel — merge into one header when their category
+   names match.
 
 ![screenshot](docs/screenshot.png)
 

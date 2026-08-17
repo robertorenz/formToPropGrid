@@ -235,6 +235,55 @@ HIDE(?LookDept)
 * This reads the whole table once, at window-open time — it suits code tables, not files with
   thousands of records. Leave the browse button alone for those.
 
+#### Added rows for things that are not on the window (the *Added rows* tab)
+
+`BuildFromWindow` can only convert controls that exist. The **Added properties…** list adds
+rows for a variable or dictionary column that has **no control** on this window (or that the
+scan cannot convert) — the same list the `PropertyGridControl` template offers:
+
+| Prompt | Default |
+|---|---|
+| *Variable / field* (REQ) | — (dictionary lookup button, or any variable in scope) |
+| *Display name* | derived from the variable: leading `?` and prefix stripped (`Loc:ReceiverPhone` → `ReceiverPhone`) |
+| *Category* | blank = the extension's default category |
+| *Editor* | `Text` (Text\|Password\|Drop list\|Checkbox\|Radio\|Slider\|Spin\|Button\|Color\|Date\|Time\|Multiline\|Read only) |
+| *Choices* (Drop/Radio), *Range low/high/step* (Slider/Spin), *Picture* (Date/Time) | `@d17` / `@t4` when blank |
+| *Read only*, *Description* | 0 / blank |
+
+These rows are bound to a **variable**, not to a control, so they carry no field equate and
+`SyncBack()` / `SyncFrom()` step over them (`GetTag` = 0). They are moved by two generated
+ROUTINEs instead, exactly like the control template's `PGLoad:` / `PGSave:`:
+
+```
+PGFLoad:Obj ROUTINE                    ! variables -> the added rows
+  Obj.SetValue(PGFRow:n:1,CLIP(LEFT(Loc:ReceiverPhone)))
+  Obj.SetValue(PGFRow:n:2,FORMAT(Loc:SentOn,@d17))       ! Date / Time are FORMATted
+  Obj.SetValue(PGFRow:n:3,CHOOSE(Loc:Active = 1,'1','0'))
+  Obj.Redraw()
+PGFSave:Obj ROUTINE                    ! the added rows -> variables
+  Loc:ReceiverPhone = CLIP(Obj.GetValue(PGFRow:n:1))
+  Loc:SentOn = DEFORMAT(CLIP(Obj.GetValue(PGFRow:n:2)),@d17)   ! DEFORMAT for @D/@T ONLY
+  Loc:Active = CHOOSE(CLIP(Obj.GetValue(PGFRow:n:3)) = '1',1,0)
+```
+
+* `PGFLoad:` runs once, right after the rows are added; `DO PGFLoad:Obj` yourself whenever
+  those variables change behind the grid's back.
+* `PGFSave:` is called **on the OK button, before `SyncBack()`**, and — with *Live sync* on —
+  from the `EVENT:Timer` branch whenever `TakeEvent()` handled something.
+* Numbers go back as **raw text**; `DEFORMAT` is used for `@D`/`@T` only, because an `@N`
+  picture eats the decimal point (see §6).
+* *Read only* rows, and the `Read only` / `Button` editors, are loaded but never saved.
+* Embeds: *before/after loading the added rows*, *before/after saving the added rows*.
+
+**Categories merge by name across all four row sources** — the converted controls, the lookup
+drop-downs, the added rows and the OK/Cancel actions. A name equal to the default category
+reuses `PGFCat:n`, one equal to the actions category reuses `PGFAct:n` (created early when a
+lookup or added row asks for it by name), anything else gets one `PGFLCat:n:k` per distinct
+name. Three names, three `AddCategory` calls, no duplicate headers.
+
+> With *Live sync* off **and** no OK button resolved, nothing calls `PGFSave:` — the same
+> caveat that already applies to `SyncBack()`.
+
 #### The browse button that is still there
 
 Any button row (including a `'...'` you did **not** convert) POSTs `EVENT:Accepted` to the
@@ -300,32 +349,41 @@ TXA gotcha worth writing down: a repeating `#BUTTON(...),MULTI(%list,%desc)` lis
 The `WHEN` keys must be **unquoted integers**; a quoted key (`WHEN ('1') ...`) corrupts the
 `.app`, after which `-ag` reports *"cannot be load. Probably it has an invalid format"*.
 
-Two more measured `-ai` rules, learned the hard way while testing the Lookups list:
+Two more measured `-ai` rules, learned the hard way while testing the repeating lists:
 
 * the number of keys in `(1, 2)` decides how many rows survive — `WHEN` entries whose key is
   not in that list are silently discarded (a list written as `(2)` with `TIMES 2` keeps only
   row 2);
-* **a MULTI list that the currently registered template declares is validated on import, and
-  rows that fail validation are dropped without a message** — hand-written rows for a *new*
-  repeating prompt import cleanly when the *previous* template version (the one without those
-  prompts) is registered, because unknown prompts are stored verbatim. Register the new
-  template afterwards and `-ag` picks the values up. That is the reliable headless recipe for
-  testing a new `MULTI` list:
+* **do not paste a new `%list MULTI …` block anywhere you like.** With the template
+  registered, `-ax` already writes an *empty* declaration for every repeating prompt
+  (`%F2PAdded MULTI LONG  ()` plus `%child DEPEND %F2PAdded <type> TIMES 0`), and it puts them
+  at the END of that addition's prompt list. A hand-inserted copy earlier in the file is
+  overwritten by the empty one that follows, and the rows vanish without a message. **Edit the
+  emitted declarations in place**, keeping the type keyword `-ax` chose (`FILE`, `KEY`,
+  `FIELD` and `LONG` values are written **unquoted**, `DEFAULT` values quoted). Done that way
+  the import works with the new template registered:
 
 ```
-ClarionCL -tu ClaPropGrid                       :: back to the OLD chain
-ClarionCL -tr <old path>\ClaPropGrid.tpl
-ClarionCL -win -au -ax app.app a.txa            :: export, paste the new %prompts in
-ClarionCL -win -au -ai app.app a.txa            :: import (stored verbatim)
-ClarionCL -tu ClaPropGrid                       :: switch to the NEW chain
-ClarionCL -tr <new path>\ClaPropGrid.tpl
+ClarionCL -tr <new path>\ClaPropGrid.tpl        :: register the NEW chain first
+ClarionCL -win -au -ax app.app a.txa            :: export - it writes the empty MULTI blocks
+::  ... replace those blocks in place with populated ones ...
+ClarionCL -win -au -ai app.app a.txa            :: import
 ClarionCL -win -au -ag app.app                  :: generate, then read the .clw
 ```
 
-And a template-language trap: inside `#FOR(%SomeMultiList)`, a `%(%MyGroup())` call that
-reads the list's child symbols comes back **empty**. Compute the value with `#SET` into a
-symbol declared in `#ATSTART` and emit `%MySymbol` instead — that is what the Lookups code
-does for the category variable and the description control.
+Template-language traps around `#FOR(%SomeMultiList)`, all measured in this chain:
+
+| Call in a generated line, inside `#FOR` over a MULTI list | Result |
+|---|---|
+| `%(%PGEditorEquate(%F2PAddEditor))` — **one** argument | works (`PGT:Date` emitted) |
+| `%(%PGLabelFor(%F2PAddName,%F2PAddVar))` — **two** arguments | expands to **nothing** |
+| `%(%PGAddedLabel())` — no arguments, but the group reads *this* template's MULTI children | expands to **nothing** |
+| `%(%PGDefaultLabel())` — no arguments, group reads the *control* template's symbols | works there, and **silently kills the whole `#AT` block** when called from the extension |
+
+So: compute values with `#SET` into symbols declared in `#ATSTART` and emit `%MySymbol`. That
+is what the Lookups code does for the category variable and the description control, and what
+the Added-rows code does for the row label. **If generated code disappears entirely, suspect a
+`#GROUP` call** — AppGen reports nothing.
 
 ## 8. Troubleshooting
 
@@ -342,3 +400,5 @@ does for the category variable and the description control.
 | A lookup drop-down row shows the raw code instead of a description | the code is not in the scanned list — the table has more rows than `MaxScanItems`, the code field on the form and in the file differ in type/padding, or the record was added after the window opened |
 | A lookup row's drop-down is empty | the lookup file was empty, or `Relate:<file>` could not open — check the file is in the app (the template adds it to the procedure automatically, but the *table* must exist in the dictionary) |
 | The grid still shows the old code after a `'...'` browse | the window has no timer: `PendingSyncFrom` is counted down inside `TakeEvent`, which only runs on `EVENT:Timer` |
+| An added row shows the right value but never writes it back | *Live sync* off and no OK button resolved — nothing calls `PGFSave:`; or the row is marked *Read only* / uses the `Read only` or `Button` editor |
+| An added row shows a number as `1234.56000000` or a date as `82907` | the editor type is `Text` — pick `Date` / `Time` (and a picture) so the row is FORMATted |

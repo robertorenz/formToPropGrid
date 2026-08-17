@@ -375,6 +375,39 @@ PGSave:%PGObject ROUTINE
       #ENDBUTTON
     #ENDBOXED
   #ENDTAB
+  #TAB('&Added rows')
+    #BOXED('Rows for things that are NOT on the window')
+      #DISPLAY('BuildFromWindow can only convert controls that exist.  Add rows')
+      #DISPLAY('here for a variable or dictionary column that has no control on')
+      #DISPLAY('this window - or that the automatic conversion cannot handle -')
+      #DISPLAY('exactly as the PropertyGridControl template does.')
+      #DISPLAY('')
+      #DISPLAY('These rows are bound to a VARIABLE, not to a control, so they')
+      #DISPLAY('are loaded and saved by the generated PGFLoad: / PGFSave:')
+      #DISPLAY('routines instead of by SyncBack().  Entries whose Category name')
+      #DISPLAY('matches the default category, a lookup category or the Actions')
+      #DISPLAY('category are merged into that one header.')
+      #BUTTON('&Added properties...'),MULTI(%F2PAdded,%F2PAddCat & ' / ' & %F2PAddVar & '  [' & %F2PAddEditor & ']'),INLINE
+        #PROMPT('&Variable / field:',FIELD),%F2PAddVar,REQ
+        #PROMPT('&Display name (blank = derived from the variable):',@s64),%F2PAddName
+        #PROMPT('&Category (blank = the default category):',@s64),%F2PAddCat
+        #PROMPT('&Editor:',DROP('Text|Password|Drop list|Checkbox|Radio|Slider|Spin|Button|Color|Date|Time|Multiline|Read only')),%F2PAddEditor,DEFAULT('Text')
+        #ENABLE(%F2PAddEditor='Drop list' OR %F2PAddEditor='Radio')
+          #PROMPT('C&hoices, pipe separated (Red|Green|Blue):',@s255),%F2PAddChoices
+        #ENDENABLE
+        #ENABLE(%F2PAddEditor='Slider' OR %F2PAddEditor='Spin')
+          #PROMPT('Range &low:',@n-13.4),%F2PAddLow,DEFAULT(0)
+          #PROMPT('Range h&igh:',@n-13.4),%F2PAddHigh,DEFAULT(100)
+          #PROMPT('&Step:',@n-13.4),%F2PAddStep,DEFAULT(1)
+        #ENDENABLE
+        #ENABLE(%F2PAddEditor='Date' OR %F2PAddEditor='Time')
+          #PROMPT('&Picture (blank = @d17 for Date, @t4 for Time):',@s20),%F2PAddPicture
+        #ENDENABLE
+        #PROMPT('&Read only',CHECK),%F2PAddReadOnly,DEFAULT(0),AT(10)
+        #PROMPT('D&escription (shown in the description pane):',@s255),%F2PAddDesc
+      #ENDBUTTON
+    #ENDBOXED
+  #ENDTAB
   #TAB('&Buttons')
     #BOXED('OK and Cancel')
       #PROMPT('&Handling:',DROP('Keep the buttons visible|Add OK/Cancel rows to the grid and hide the buttons')),%F2PButtons,DEFAULT('Keep the buttons visible')
@@ -409,21 +442,45 @@ PGSave:%PGObject ROUTINE
   #DECLARE(%F2PLCatNo)
   #DECLARE(%F2PLCatVar)
   #DECLARE(%F2PLNameCtl)
+  #DECLARE(%F2PAddNo)
+  #DECLARE(%F2PAddPic)
+  #DECLARE(%F2PAddLbl)
+  #DECLARE(%F2PAddPos)
+  #DECLARE(%F2PActEarly)
   #SET(%F2PStyleNum,%PGStyleNumber())
   #EQUATE(%F2POkCtl,%PGGetOkControl())
   #EQUATE(%F2PCancelCtl,%PGGetCancelControl())
   #IF(%F2PClass = '')
     #SET(%F2PClass,'PropGridClass')
   #ENDIF
-#!  the DISTINCT category overrides used by the lookup rows.  A blank
-#!  override - or one that just repeats the default category - reuses
-#!  PGFCat and gets no entry here.
+#!-----------------------------------------------------------------------------
+#!  Categories.  Four things add rows to this one grid - the converted
+#!  controls, the lookup drop-downs, the added properties and the OK/Cancel
+#!  actions - and rows merge into ONE header whenever the names match:
+#!      name = the default category   -> PGFCat:n   (always exists)
+#!      name = the actions category   -> PGFAct:n   (only when actions are on)
+#!      anything else                 -> PGFLCat:n:k, k = INSTANCE in %F2PLCats
+#!  %F2PActEarly says a lookup or added row needs PGFAct BEFORE the actions
+#!  block creates it, so Init has to create that category early.
+#!-----------------------------------------------------------------------------
   #IF(VAREXISTS(%F2PLCats) = 0)
     #DECLARE(%F2PLCats),MULTI,UNIQUE
   #ENDIF
   #FREE(%F2PLCats)
+  #SET(%F2PActEarly,0)
   #FOR(%F2PLookup),WHERE(%F2PLookupCat AND UPPER(%F2PLookupCat) <> UPPER(%F2PCategory))
-    #ADD(%F2PLCats,%F2PLookupCat)
+    #IF(%F2PButtons = 'Add OK/Cancel rows to the grid and hide the buttons' AND UPPER(%F2PLookupCat) = UPPER(%F2PActionCat))
+      #SET(%F2PActEarly,1)
+    #ELSE
+      #ADD(%F2PLCats,%F2PLookupCat)
+    #ENDIF
+  #ENDFOR
+  #FOR(%F2PAdded),WHERE(%F2PAddCat AND UPPER(%F2PAddCat) <> UPPER(%F2PCategory))
+    #IF(%F2PButtons = 'Add OK/Cancel rows to the grid and hide the buttons' AND UPPER(%F2PAddCat) = UPPER(%F2PActionCat))
+      #SET(%F2PActEarly,1)
+    #ELSE
+      #ADD(%F2PLCats,%F2PAddCat)
+    #ENDIF
   #ENDFOR
 #ENDAT
 #!
@@ -470,13 +527,17 @@ PGFLBuf:%ActiveTemplateInstance  USHORT                          ! ABC SaveBuffe
   #ENDIF
   #FOR(%F2PLCats)
     #SET(%F2PLCatNo,INSTANCE(%F2PLCats))
-PGFLCat:%ActiveTemplateInstance:%F2PLCatNo LONG                  ! lookup category '%F2PLCats'
+PGFLCat:%ActiveTemplateInstance:%F2PLCatNo LONG                  ! extra category '%F2PLCats'
   #ENDFOR
   #FOR(%F2PLookup)
     #SET(%F2PLNo,INSTANCE(%F2PLookup))
 PGFLRow:%ActiveTemplateInstance:%F2PLNo  LONG                    ! drop row for %F2PLookupCode
 PGFLCode:%ActiveTemplateInstance:%F2PLNo STRING(2048)            ! pipe list: %F2PLookupFile.%F2PLookupCodeFld
 PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F2PLookupFile.%F2PLookupDescFld
+  #ENDFOR
+  #FOR(%F2PAdded)
+    #SET(%F2PAddNo,INSTANCE(%F2PAdded))
+PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for %F2PAddVar
   #ENDFOR
 #ENDAT
 #!
@@ -513,6 +574,9 @@ PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F
     #ENDIF
   #ENDFOR
     PGFCat:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PCategory')
+  #IF(%F2PActEarly)
+    PGFAct:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PActionCat') ! a lookup / added row asked for this one by name
+  #ENDIF
     %F2PObject.BuildFromWindow(PGFCat:%ActiveTemplateInstance,CLIP(PGFExcl:%ActiveTemplateInstance))
   #FOR(%F2PLCats)
     #SET(%F2PLCatNo,INSTANCE(%F2PLCats))
@@ -530,6 +594,8 @@ PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F
     #ENDIF
     #IF(%F2PLCatNo)
       #SET(%F2PLCatVar,'PGFLCat:' & %ActiveTemplateInstance & ':' & %F2PLCatNo)
+    #ELSIF(%F2PActEarly AND %F2PLookupCat AND UPPER(%F2PLookupCat) = UPPER(%F2PActionCat))
+      #SET(%F2PLCatVar,'PGFAct:' & %ActiveTemplateInstance)
     #ENDIF
     #SET(%F2PLNameCtl,'0')
     #IF(%F2PLookupDesc)
@@ -567,8 +633,59 @@ PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F
     HIDE(%F2PLookupBtn)                                           ! the drop row replaces the browse
     #ENDIF
   #ENDFOR
+  #! ---- added rows: bound to a VARIABLE, so they carry no tag and are
+  #! ---- loaded / saved by the PGFLoad: / PGFSave: routines below.
+  #FOR(%F2PAdded)
+    #SET(%F2PAddNo,INSTANCE(%F2PAdded))
+    #SET(%F2PLCatVar,'PGFCat:' & %ActiveTemplateInstance)
+    #SET(%F2PLCatNo,0)
+    #IF(%F2PAddCat)
+      #SET(%F2PLCatNo,INLIST(%F2PAddCat,%F2PLCats))
+    #ENDIF
+    #IF(%F2PLCatNo)
+      #SET(%F2PLCatVar,'PGFLCat:' & %ActiveTemplateInstance & ':' & %F2PLCatNo)
+    #ELSIF(%F2PActEarly AND %F2PAddCat AND UPPER(%F2PAddCat) = UPPER(%F2PActionCat))
+      #SET(%F2PLCatVar,'PGFAct:' & %ActiveTemplateInstance)
+    #ENDIF
+    #! the row label: the developer's name, else the variable with any
+    #! leading '?' and any prefix stripped - the rule %PGDefaultLabel uses
+    #! for the control template, done with #SETs because a #GROUP called
+    #! from inside a #FOR over a MULTI list silently kills the whole block.
+    #SET(%F2PAddLbl,%F2PAddName)
+    #IF(%F2PAddLbl = '')
+      #SET(%F2PAddLbl,CLIP(%F2PAddVar))
+      #IF(SUB(%F2PAddLbl,1,1) = '?')
+        #SET(%F2PAddLbl,SUB(%F2PAddLbl,2,LEN(%F2PAddLbl)))
+      #ENDIF
+      #SET(%F2PAddPos,INSTRING(':',%F2PAddLbl,1,1))
+      #IF(%F2PAddPos)
+        #SET(%F2PAddLbl,SUB(%F2PAddLbl,%F2PAddPos + 1,LEN(%F2PAddLbl)))
+      #ENDIF
+      #IF(%F2PAddLbl = '')
+        #SET(%F2PAddLbl,'Field')
+      #ENDIF
+    #ENDIF
+    PGFRow:%ActiveTemplateInstance:%F2PAddNo = %F2PObject.AddProperty(%F2PLCatVar,'%F2PAddLbl',%(%PGEditorEquate(%F2PAddEditor)),'')
+    #IF(%F2PAddChoices)
+    %F2PObject.SetChoices(PGFRow:%ActiveTemplateInstance:%F2PAddNo,'%F2PAddChoices')
+    #ENDIF
+    #IF(%F2PAddEditor = 'Slider' OR %F2PAddEditor = 'Spin')
+    %F2PObject.SetRange(PGFRow:%ActiveTemplateInstance:%F2PAddNo,%F2PAddLow,%F2PAddHigh,%F2PAddStep)
+    #ENDIF
+    #IF(%F2PAddDesc)
+    %F2PObject.SetDescription(PGFRow:%ActiveTemplateInstance:%F2PAddNo,'%F2PAddDesc')
+    #ENDIF
+    #IF(%F2PAddReadOnly)
+    %F2PObject.SetReadOnly(PGFRow:%ActiveTemplateInstance:%F2PAddNo,1)
+    #ENDIF
+  #ENDFOR
+  #IF(ITEMS(%F2PAdded))
+    DO PGFLoad:%F2PObject                                         ! variables -> the added rows
+  #ENDIF
   #IF(%F2PButtons = 'Add OK/Cancel rows to the grid and hide the buttons')
+    #IF(%F2PActEarly = 0)
     PGFAct:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PActionCat')
+    #ENDIF
     #IF(%F2POkCtl)
     PGFOkRow:%ActiveTemplateInstance = %F2PObject.AddProperty(PGFAct:%ActiveTemplateInstance,'OK',PGT:Button,'OK')
     %F2PObject.SetTag(PGFOkRow:%ActiveTemplateInstance,%F2POkCtl) ! TakeButton POSTs EVENT:Accepted here
@@ -591,6 +708,9 @@ PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F
     IF %F2PObject.TakeEvent()
       #EMBED(%F2POnGridEvent,'ClaPropGrid (form): the grid raised an event'),%ActiveTemplateInstance
       !  Live sync (when it is on) is handled inside PropGridClass.TakeChanged.
+  #IF(ITEMS(%F2PAdded) AND %F2PLiveSync)
+      DO PGFSave:%F2PObject                                       ! the added rows have no control to sync into
+  #ENDIF
     END
   OF EVENT:Sized
     POST(PGFResize:%F2PObject)
@@ -603,6 +723,9 @@ PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F
 #! the grid's edits are in the USE variables before the form saves them.
 #AT(%ControlEventHandling,%F2POkCtl,'Accepted'),PRIORITY(2000),WHERE(%F2PDisable=0 AND %F2POkCtl<>''),DESCRIPTION('ClaPropGrid: push the grid into the controls')
   #EMBED(%F2PBeforeSyncBack,'ClaPropGrid (form): before SyncBack on OK'),%ActiveTemplateInstance
+  #IF(ITEMS(%F2PAdded))
+DO PGFSave:%F2PObject                                             ! added rows -> their variables (FIRST)
+  #ENDIF
   #IF(%F2PLiveSync = 0)
 %F2PObject.SyncBack()                                             ! grid -> the controls' USE variables
   #ELSE
@@ -655,6 +778,80 @@ PGPlace:%F2PObject ROUTINE
   ELSE
     %F2PObject.InitXY(%Window,PGFX:%ActiveTemplateInstance,PGFY:%ActiveTemplateInstance,PGFW:%ActiveTemplateInstance,PGFH:%ActiveTemplateInstance,%F2PStyleNum)
   END
+  #ENDIF
+  #IF(ITEMS(%F2PAdded))
+!---------------------------------------------------------------------------
+PGFLoad:%F2PObject ROUTINE
+!  variables -> the ADDED rows (the converted controls look after themselves).
+!  Called once after the grid is built; DO it again yourself whenever those
+!  variables change behind the grid's back.
+  #EMBED(%F2PBeforeLoad,'ClaPropGrid (form): before loading the added rows from the variables'),%ActiveTemplateInstance
+    #FOR(%F2PAdded)
+      #SET(%F2PAddNo,INSTANCE(%F2PAdded))
+      #SET(%F2PAddPic,%F2PAddPicture)
+      #IF(%F2PAddPic = '')
+        #IF(%F2PAddEditor = 'Time')
+          #SET(%F2PAddPic,'@t4')
+        #ELSE
+          #SET(%F2PAddPic,'@d17')
+        #ENDIF
+      #ENDIF
+      #CASE(%F2PAddEditor)
+      #OF('Date')
+      #OROF('Time')
+  %F2PObject.SetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo,FORMAT(%F2PAddVar,%F2PAddPic))
+      #OF('Checkbox')
+  %F2PObject.SetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo,CHOOSE(%F2PAddVar = 1,'1','0'))
+      #OF('Button')
+        #SET(%F2PAddLbl,%F2PAddName)
+        #IF(%F2PAddLbl = '')
+          #SET(%F2PAddLbl,CLIP(%F2PAddVar))
+          #IF(SUB(%F2PAddLbl,1,1) = '?')
+            #SET(%F2PAddLbl,SUB(%F2PAddLbl,2,LEN(%F2PAddLbl)))
+          #ENDIF
+          #SET(%F2PAddPos,INSTRING(':',%F2PAddLbl,1,1))
+          #IF(%F2PAddPos)
+            #SET(%F2PAddLbl,SUB(%F2PAddLbl,%F2PAddPos + 1,LEN(%F2PAddLbl)))
+          #ENDIF
+          #IF(%F2PAddLbl = '')
+            #SET(%F2PAddLbl,'Field')
+          #ENDIF
+        #ENDIF
+  %F2PObject.SetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo,'%F2PAddLbl')
+      #ELSE
+  %F2PObject.SetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo,CLIP(LEFT(%F2PAddVar)))
+      #ENDCASE
+    #ENDFOR
+  #EMBED(%F2PAfterLoad,'ClaPropGrid (form): after loading the added rows from the variables'),%ActiveTemplateInstance
+  %F2PObject.Redraw()
+!---------------------------------------------------------------------------
+PGFSave:%F2PObject ROUTINE
+!  the ADDED rows -> variables.  Called from the OK button (before SyncBack)
+!  and, with Live sync on, every time the grid raises an event.
+  #EMBED(%F2PBeforeSave,'ClaPropGrid (form): before saving the added rows into the variables'),%ActiveTemplateInstance
+    #FOR(%F2PAdded)
+      #SET(%F2PAddNo,INSTANCE(%F2PAdded))
+      #SET(%F2PAddPic,%F2PAddPicture)
+      #IF(%F2PAddPic = '')
+        #IF(%F2PAddEditor = 'Time')
+          #SET(%F2PAddPic,'@t4')
+        #ELSE
+          #SET(%F2PAddPic,'@d17')
+        #ENDIF
+      #ENDIF
+      #IF(%F2PAddReadOnly = 0 AND %F2PAddEditor <> 'Read only' AND %F2PAddEditor <> 'Button')
+        #CASE(%F2PAddEditor)
+        #OF('Date')
+        #OROF('Time')
+  %F2PAddVar = DEFORMAT(CLIP(%F2PObject.GetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo)),%F2PAddPic)
+        #OF('Checkbox')
+  %F2PAddVar = CHOOSE(CLIP(%F2PObject.GetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo)) = '1',1,0)
+        #ELSE
+  %F2PAddVar = CLIP(%F2PObject.GetValue(PGFRow:%ActiveTemplateInstance:%F2PAddNo))
+        #ENDCASE
+      #ENDIF
+    #ENDFOR
+  #EMBED(%F2PAfterSave,'ClaPropGrid (form): after saving the added rows into the variables'),%ActiveTemplateInstance
   #ENDIF
 #ENDAT
 #!=============================================================================
