@@ -1,0 +1,11 @@
+# everything build.bat stages or produces - all of it is generated
+PropGrid.inc
+PropGrid.clw
+propgrid.lib
+propgrid.dll
+ClaRUN.dll
+*.exe
+*.lib
+*.map
+map/
+obj/

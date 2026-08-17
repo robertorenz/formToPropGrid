@@ -75,16 +75,29 @@ typedef struct Prop {
     double  lo, hi, step;
     BOOL    readOnly;
     LONG    tag;
+    int     fontName;   /* 0 = inherit the category, then PGF_NAME   */
+    int     fontValue;  /* 0 = inherit the category, then PGF_VALUE  */
+    int     wrapLines;  /* 0 = one line + ellipsis (the default),
+                           n = wrap over up to n lines and grow the
+                           row to fit, -1 = as many as it takes      */
 } Prop;
 
 typedef struct Cat {
     WCHAR  *name;
     BOOL    expanded;
+    int     fontHdr;    /* 0 = inherit PGF_CATEGORY                  */
+    int     fontName;   /* 0 = inherit PGF_NAME  - for its rows      */
+    int     fontValue;  /* 0 = inherit PGF_VALUE - for its rows      */
 } Cat;
 
+/* One visible line.  h and y are recomputed by RebuildVis: rows are
+   NOT a uniform height any more, so every hit test, every scroll and
+   the paint window all read this table instead of multiplying. */
 typedef struct VisItem {
     BOOL    isCat;
     int     id;         /* prop id or cat id (1-based)               */
+    int     h;          /* this line's height, px                    */
+    int     y;          /* cumulative top, px, in document space     */
 } VisItem;
 
 typedef struct Grid {
@@ -94,7 +107,10 @@ typedef struct Grid {
 
     ID2D1HwndRenderTarget* rt;
     ID2D1SolidColorBrush*  br;
-    FontSpec fonts[5];              /* index by PGF_*                */
+    /* fonts[1..4] are the PGF_* slots, fonts[5..nFonts] are the extra
+       ones handed out by PG_AddFont.  fonts[0] is unused so that a
+       font id of 0 can mean "inherit". */
+    FontSpec *fonts; int nFonts, capFonts;
     COLORREF colors[12];            /* index by PGC_*                */
 
     int     rowH;                   /* 0 = auto                      */
@@ -105,6 +121,11 @@ typedef struct Grid {
     Cat    *cats;   int nCats,  capCats;
     VisItem*vis;    int nVis,   capVis;
     BOOL    visDirty;
+    int     visTotalH;              /* sum of every vis[].h          */
+    BOOL    anyWrap;                /* a wrapped row exists: heights
+                                       depend on the cell width, so a
+                                       resize / splitter drag has to
+                                       re-measure, not just repaint  */
 
     int     scrollY;
     int     sel;                    /* selected prop id, 0 = none    */
@@ -114,7 +135,9 @@ typedef struct Grid {
     HWND    hEdit;   int editProp;  /* in-place EDIT overlay         */
     HWND    hList;   int listProp;  /* popup choice list             */
     HWND    hMulti;  int multiProp; /* popup multiline editor        */
-    HFONT   hEditFont;
+    HFONT   hEditFont; int hEditFontId;  /* font the HFONT was built
+                                       from, so an editor opened on a
+                                       row with its own font matches */
     BOOL    inCommit;
 
     BOOL    dragSplit;
@@ -191,11 +214,132 @@ static Cat* CAT(Grid* g, int id)
     return (id >= 1 && id <= g->nCats) ? &g->cats[id - 1] : NULL;
 }
 
-static int RowH(Grid* g)
+/*------------------------------------------------------------------*/
+/* fonts: id resolution and the height each one needs                 */
+/*------------------------------------------------------------------*/
+/* A font id is valid when it is one of the four slots or one that
+   PG_AddFont handed out.  Anything else (0 included) means inherit. */
+static BOOL FontOk(Grid* g, int id)
+{
+    return id >= PGF_NAME && id < g->nFonts && g->fonts[id].sizePt > 0;
+}
+
+/* used only if someone reaches a font before PG_Create allocated the
+   table - never in normal flow, but it keeps every path NULL-safe */
+static FontSpec g_fallbackFont = { L"Segoe UI", 9.0f, FALSE, FALSE, NULL };
+
+static FontSpec* FONT(Grid* g, int id)
+{
+    if (!g->fonts || g->nFonts <= PGF_VALUE) return &g_fallbackFont;
+    return FontOk(g, id) ? &g->fonts[id] : &g->fonts[PGF_VALUE];
+}
+
+/* the font a category header / a row's name / a row's value draws in,
+   resolved row -> category -> global slot */
+static int HdrFontOf(Grid* g, const Cat* c)
+{
+    if (c && FontOk(g, c->fontHdr)) return c->fontHdr;
+    return PGF_CATEGORY;
+}
+
+static int NameFontOf(Grid* g, const Prop* p)
+{
+    if (!p) return PGF_NAME;
+    if (FontOk(g, p->fontName)) return p->fontName;
+    const Cat* c = CAT(g, p->cat);
+    if (c && FontOk(g, c->fontName)) return c->fontName;
+    return PGF_NAME;
+}
+
+static int ValueFontOf(Grid* g, const Prop* p)
+{
+    if (!p) return PGF_VALUE;
+    if (FontOk(g, p->fontValue)) return p->fontValue;
+    const Cat* c = CAT(g, p->cat);
+    if (c && FontOk(g, c->fontValue)) return c->fontValue;
+    return PGF_VALUE;
+}
+
+/* the row height one font asks for - the original formula, per font */
+static int FontRowPx(Grid* g, int id)
+{
+    int h = (int)(FONT(g, id)->sizePt * g->dpi / 72.0f) + 10;
+    return h < 20 ? 20 : h;
+}
+
+/* The nominal line: what a wheel notch, an arrow click and a page of
+   PgUp/PgDn are worth.  Still driven by the value slot, so scrolling
+   feels the same as it always did whatever individual rows do. */
+static int DefRowH(Grid* g)
 {
     if (g->rowH > 0) return g->rowH;
-    int h = (int)(g->fonts[PGF_VALUE].sizePt * g->dpi / 72.0f) + 10;
-    return h < 20 ? 20 : h;
+    return FontRowPx(g, PGF_VALUE);
+}
+
+#define WRAP_MAXLINES  64      /* hard stop so one huge value cannot
+                                  swallow the whole grid             */
+
+/* Width the value text gets when it wraps.  Depends on the splitter
+   and the client width, which is why anyWrap forces a re-measure. */
+static int ValueTextWidth(Grid* g, const Prop* p)
+{
+    RECT rc; GetClientRect(g->hwnd, &rc);
+    int w = rc.right - (g->splitter + 1) - CELL_PAD * 2;
+    if (p && (p->type == PGT_MULTITEXT || p->type == PGT_DROP ||
+              p->type == PGT_SPIN))
+        w -= GLYPH_ZONE;
+    return w > 16 ? w : 16;
+}
+
+/* Height a wrapped value needs, 0 when it does not wrap after all.
+   Measured with a real DWrite layout, so it matches what is painted. */
+static int WrapTextPx(Grid* g, const WCHAR* txt, int fontId, int width,
+                      int maxLines)
+{
+    if (!g_dw || !txt || !*txt || width < 16) return 0;
+    IDWriteTextFormat* fmt = FONT(g, fontId)->fmt;
+    if (!fmt) return 0;
+    IDWriteTextLayout* lay = NULL;
+    HRESULT hr = g_dw->CreateTextLayout(txt, (UINT32)wcslen(txt), fmt,
+        (FLOAT)width, 100000.0f, &lay);
+    if (FAILED(hr) || !lay) return 0;
+    lay->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+    UINT32 n = 0;
+    lay->GetLineMetrics(NULL, 0, &n);              /* ask for the count */
+    int h = 0;
+    if (n > 0) {
+        DWRITE_LINE_METRICS* lm =
+            (DWRITE_LINE_METRICS*)malloc(n * sizeof(DWRITE_LINE_METRICS));
+        if (lm && SUCCEEDED(lay->GetLineMetrics(lm, n, &n))) {
+            UINT32 cap = (maxLines > 0 && (UINT32)maxLines < n)
+                       ? (UINT32)maxLines : n;
+            if (cap > WRAP_MAXLINES) cap = WRAP_MAXLINES;
+            for (UINT32 i = 0; i < cap; i++) h += (int)(lm[i].height + 0.5f);
+        }
+        free(lm);
+    }
+    lay->Release();
+    return h;
+}
+
+/* The height of one visible line.  An explicit PG_SetRowHeight still
+   wins outright - that is the escape hatch for a caller who wants the
+   old uniform look back. */
+static int ItemHeight(Grid* g, BOOL isCat, int id)
+{
+    if (g->rowH > 0) return g->rowH;
+    if (isCat) return FontRowPx(g, HdrFontOf(g, CAT(g, id)));
+    Prop* p = PROP(g, id);
+    int hn = FontRowPx(g, NameFontOf(g, p));
+    int hv = FontRowPx(g, ValueFontOf(g, p));
+    int h  = hn > hv ? hn : hv;
+    if (p && p->wrapLines && p->value && *p->value && g->hwnd) {
+        int wrapped = WrapTextPx(g, p->value, ValueFontOf(g, p),
+                                 ValueTextWidth(g, p), p->wrapLines);
+        wrapped += 8;                              /* the cell's padding */
+        if (wrapped > h) h = wrapped;
+    }
+    return h;
 }
 
 /*------------------------------------------------------------------*/
@@ -236,15 +380,24 @@ static void RebuildFormat(Grid* g, int part)
     }
 }
 
-static void RebuildEditFont(Grid* g)
+/* The GDI font the native EDIT / LISTBOX overlays wear.  Only ever
+   called with no editor open, so deleting the old HFONT is safe. */
+static void RebuildEditFont(Grid* g, int fontId)
 {
     if (g->hEditFont) { DeleteObject(g->hEditFont); g->hEditFont = NULL; }
-    FontSpec* f = &g->fonts[PGF_VALUE];
+    FontSpec* f = FONT(g, fontId);
     int px = (int)(f->sizePt * g->dpi / 72.0f + 0.5f);
     g->hEditFont = CreateFontW(-px, 0, 0, 0,
         f->bold ? FW_SEMIBOLD : FW_NORMAL, f->italic, 0, 0,
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
         CLEARTYPE_QUALITY, DEFAULT_PITCH, f->face);
+    g->hEditFontId = fontId;
+}
+
+static void EnsureEditFont(Grid* g, int fontId)
+{
+    if (g->hEditFont && g->hEditFontId == fontId) return;
+    RebuildEditFont(g, fontId);
 }
 
 static void DiscardRT(Grid* g)
@@ -310,7 +463,37 @@ static void RebuildVis(Grid* g)
         VisPush(g, TRUE, c);
         if (g->cats[c - 1].expanded) AddCatProps(g, c);
     }
+    /* measure every line and lay them out head to tail.  This is the
+       one place row geometry is decided; everything else reads it. */
+    int y = 0;
+    g->anyWrap = FALSE;
+    for (int i = 0; i < g->nVis; i++) {
+        VisItem* it = &g->vis[i];
+        if (!it->isCat) {
+            Prop* p = PROP(g, it->id);
+            if (p && p->wrapLines) g->anyWrap = TRUE;
+        }
+        it->h = ItemHeight(g, it->isCat, it->id);
+        it->y = y;
+        y += it->h;
+    }
+    g->visTotalH = y;
     g->visDirty = FALSE;
+}
+
+/* index of the line covering a document-space y, -1 when past the end */
+static int VisIndexAtY(Grid* g, int docY)
+{
+    if (g->nVis <= 0 || docY < 0) return -1;
+    int lo = 0, hi = g->nVis - 1;
+    while (lo <= hi) {
+        int mid = (lo + hi) / 2;
+        VisItem* it = &g->vis[mid];
+        if (docY < it->y)             hi = mid - 1;
+        else if (docY >= it->y + it->h) lo = mid + 1;
+        else return mid;
+    }
+    return -1;
 }
 
 static void UpdateScroll(Grid* g)
@@ -319,7 +502,7 @@ static void UpdateScroll(Grid* g)
     RECT rc; GetClientRect(g->hwnd, &rc);
     int view = rc.bottom - g->descH;
     if (view < 0) view = 0;
-    int content = g->nVis * RowH(g);
+    int content = g->visTotalH;
     SCROLLINFO si = { sizeof(si), SIF_RANGE | SIF_PAGE | SIF_POS };
     si.nMin = 0; si.nMax = content > 0 ? content - 1 : 0;
     si.nPage = view; si.nPos = g->scrollY;
@@ -352,10 +535,9 @@ static BOOL PropRowRect(Grid* g, int id, RECT* out)
     int vi = VisIndexOfProp(g, id);
     if (vi < 0) return FALSE;
     RECT rc; GetClientRect(g->hwnd, &rc);
-    int rh = RowH(g);
     out->left = 0; out->right = rc.right;
-    out->top = vi * rh - g->scrollY;
-    out->bottom = out->top + rh;
+    out->top = g->vis[vi].y - g->scrollY;
+    out->bottom = out->top + g->vis[vi].h;
     return TRUE;
 }
 
@@ -571,9 +753,14 @@ static void BeginEdit(Grid* g, int id, WCHAR firstChar)
         p->type != PGT_SPIN && p->type != PGT_SLIDER &&
         p->type != PGT_MULTITEXT) return;
     CloseEditors(g, TRUE);
+    EnsureEditFont(g, ValueFontOf(g, p));
     RECT rc; EditRect(g, id, &rc);
     DWORD es = WS_CHILD | WS_VISIBLE | ES_AUTOHSCROLL;
     if (p->type == PGT_PASSWORD) es |= ES_PASSWORD;
+    if (p->wrapLines) {                /* the cell is tall - edit it that way */
+        es &= ~ES_AUTOHSCROLL;
+        es |= ES_MULTILINE | ES_AUTOVSCROLL;
+    }
     g->hEdit = CreateWindowExW(0, L"EDIT", p->value ? p->value : L"",
         es, rc.left, rc.top + 1, rc.right - rc.left, rc.bottom - rc.top - 1,
         g->hwnd, NULL, (HINSTANCE)GetModuleHandleW(NULL), NULL);
@@ -597,6 +784,7 @@ static void OpenList(Grid* g, int id)
     dbg("OpenList id=%d p=%p ro=%d choices=%p", id, p, p ? p->readOnly : -1, p ? p->choices : 0);
     if (!p || p->readOnly || !p->choices || !*p->choices) return;
     CloseEditors(g, TRUE);
+    EnsureEditFont(g, ValueFontOf(g, p));
     RECT row; if (!PropRowRect(g, id, &row)) return;
     RECT cell; ValueCell(g, &row, &cell);
     POINT pt = { cell.left, row.bottom };
@@ -604,7 +792,7 @@ static void OpenList(Grid* g, int id)
     /* count choices */
     int n = 1; const WCHAR* c;
     for (c = p->choices; *c; c++) if (*c == L'|') n++;
-    int rh = RowH(g);
+    int rh = FontRowPx(g, ValueFontOf(g, p));   /* the row's own font */
     int lh = n * (rh - 2) + 4; if (lh > 8 * rh) lh = 8 * rh;
     g->hList = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
         L"LISTBOX", L"", WS_POPUP | WS_BORDER | WS_VSCROLL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT,
@@ -635,6 +823,7 @@ static void OpenMulti(Grid* g, int id)
     Prop* p = PROP(g, id);
     if (!p || p->readOnly) return;
     CloseEditors(g, TRUE);
+    EnsureEditFont(g, ValueFontOf(g, p));
     RECT row; if (!PropRowRect(g, id, &row)) return;
     RECT cell; ValueCell(g, &row, &cell);
     POINT pt = { cell.left, row.bottom };
@@ -643,7 +832,7 @@ static void OpenMulti(Grid* g, int id)
     g->hMulti = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
         L"EDIT", p->value ? p->value : L"",
         WS_POPUP | WS_BORDER | ES_MULTILINE | ES_AUTOVSCROLL | ES_WANTRETURN | WS_VSCROLL,
-        pt.x, pt.y, w, RowH(g) * 6,
+        pt.x, pt.y, w, FontRowPx(g, ValueFontOf(g, p)) * 6,
         g->hwnd, NULL, (HINSTANCE)GetModuleHandleW(NULL), NULL);
     if (!g->hMulti) return;
     g->multiProp = id;
@@ -688,8 +877,7 @@ static int HitTest(Grid* g, int x, int y, int* zone)
     if (g->visDirty) RebuildVis(g);
     RECT rc; GetClientRect(g->hwnd, &rc);
     if (y >= rc.bottom - g->descH) return 0;
-    int rh = RowH(g);
-    int vi = (y + g->scrollY) / rh;
+    int vi = VisIndexAtY(g, y + g->scrollY);
     if (vi < 0 || vi >= g->nVis) {
         if (abs(x - g->splitter) <= SPLIT_GRAB) *zone = ZONE_SPLIT;
         return 0;
@@ -757,6 +945,30 @@ static void DrawTextC(Grid* g, const WCHAR* txt, const RECT* rc,
         g->br, D2D1_DRAW_TEXT_OPTIONS_CLIP);
 }
 
+/* Wrapped multi-line draw.  The shared IDWriteTextFormat is single
+   line, vertically centred and ellipsis-trimmed, so a wrapped cell
+   needs its own layout: wrap on, top aligned, clipped to the cell. */
+static void DrawTextWrapC(Grid* g, const WCHAR* txt, const RECT* rc,
+                          int fontId, COLORREF c, int maxLines)
+{
+    if (!txt || !*txt || !g_dw) return;
+    IDWriteTextFormat* fmt = FONT(g, fontId)->fmt;
+    if (!fmt) return;
+    FLOAT w = (FLOAT)(rc->right - rc->left);
+    FLOAT h = (FLOAT)(rc->bottom - rc->top);
+    if (w < 4 || h < 2) return;
+    IDWriteTextLayout* lay = NULL;
+    if (FAILED(g_dw->CreateTextLayout(txt, (UINT32)wcslen(txt), fmt, w, h,
+                                      &lay)) || !lay) return;
+    lay->SetWordWrapping(DWRITE_WORD_WRAPPING_WRAP);
+    lay->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+    (void)maxLines;                    /* the row was sized for them  */
+    g->br->SetColor(CrToD2D(c));
+    g->rt->DrawTextLayout(D2D1::Point2F((FLOAT)rc->left, (FLOAT)rc->top),
+        lay, g->br, D2D1_DRAW_TEXT_OPTIONS_CLIP);
+    lay->Release();
+}
+
 static void HLine(Grid* g, int x1, int x2, int y, COLORREF c)
 {
     g->br->SetColor(CrToD2D(c));
@@ -778,6 +990,7 @@ static void PaintValue(Grid* g, Prop* p, int id, RECT cell)
     COLORREF vt = p->readOnly ? RGB(130, 130, 130) : g->colors[PGC_VALUETEXT];
     RECT tr = cell; tr.left += CELL_PAD;
     int midY = (cell.top + cell.bottom) / 2;
+    int vf = ValueFontOf(g, p);        /* row -> category -> PGF_VALUE */
     switch (p->type) {
     case PGT_PASSWORD: {
         if (p->value && *p->value) {
@@ -785,7 +998,7 @@ static void PaintValue(Grid* g, Prop* p, int id, RECT cell)
             WCHAR mask[26]; size_t i;
             for (i = 0; i < n; i++) mask[i] = 0x25CF;   /* ● */
             mask[n] = 0;
-            DrawTextC(g, mask, &tr, PGF_VALUE, vt);
+            DrawTextC(g, mask, &tr, vf, vt);
         }
         break;
     }
@@ -819,7 +1032,7 @@ static void PaintValue(Grid* g, Prop* p, int id, RECT cell)
             g->rt->FillEllipse(e, g->br);
             t2.left += 16;
         }
-        DrawTextC(g, p->value, &t2, PGF_VALUE, vt);
+        DrawTextC(g, p->value, &t2, vf, vt);
         /* chevron */
         FLOAT cx = (FLOAT)(cell.right - GLYPH_ZONE / 2 - 2), cy = (FLOAT)midY;
         g->br->SetColor(CrToD2D(RGB(90, 90, 90)));
@@ -841,12 +1054,12 @@ static void PaintValue(Grid* g, Prop* p, int id, RECT cell)
         g->rt->DrawLine(D2D1::Point2F((FLOAT)tx1, fy), D2D1::Point2F(fx, fy), g->br, 3.0f);
         g->rt->FillEllipse(D2D1::Ellipse(D2D1::Point2F(fx, fy), 6, 6), g->br);
         RECT vr = cell; vr.left = cell.right - 52; vr.right -= 4;
-        DrawTextC(g, p->value, &vr, PGF_VALUE, vt);
+        DrawTextC(g, p->value, &vr, vf, vt);
         break;
     }
     case PGT_SPIN: {
         RECT t2 = tr; t2.right = cell.right - GLYPH_ZONE - 2;
-        DrawTextC(g, p->value, &t2, PGF_VALUE, vt);
+        DrawTextC(g, p->value, &t2, vf, vt);
         int zx = cell.right - GLYPH_ZONE;
         VLine(g, zx, cell.top, cell.bottom, g->colors[PGC_LINES]);
         HLine(g, zx, cell.right, midY, g->colors[PGC_LINES]);
@@ -869,10 +1082,10 @@ static void PaintValue(Grid* g, Prop* p, int id, RECT cell)
         g->rt->DrawRoundedRectangle(rr, g->br, 1.0f);
         RECT br2 = cell;
         const WCHAR* lbl = (p->value && *p->value) ? p->value : p->name;
-        IDWriteTextFormat* fmt = g->fonts[PGF_VALUE].fmt;
+        IDWriteTextFormat* fmt = FONT(g, vf)->fmt;
         if (fmt) {
             fmt->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_CENTER);
-            DrawTextC(g, lbl, &br2, PGF_VALUE, RGB(0x20, 0x2A, 0x36));
+            DrawTextC(g, lbl, &br2, vf, RGB(0x20, 0x2A, 0x36));
             fmt->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         }
         break;
@@ -893,26 +1106,40 @@ static void PaintValue(Grid* g, Prop* p, int id, RECT cell)
         g->rt->DrawRectangle(swr, g->br, 1.0f);
         RECT t2 = tr; t2.left += sw + 8;
         WCHAR buf[16]; swprintf(buf, 16, L"#%06lX", x & 0xFFFFFF);
-        DrawTextC(g, buf, &t2, PGF_VALUE, vt);
+        DrawTextC(g, buf, &t2, vf, vt);
         break;
     }
     case PGT_MULTITEXT: {
         RECT t2 = tr; t2.right = cell.right - GLYPH_ZONE - 2;
-        /* first line only */
-        WCHAR line[256]; int i = 0;
-        const WCHAR* s = p->value ? p->value : L"";
-        while (*s && *s != L'\r' && *s != L'\n' && i < 255) line[i++] = *s++;
-        line[i] = 0;
-        if (*s) { wcscat_s(line, 256, L" \x2026"); }
-        DrawTextC(g, line, &t2, PGF_VALUE, vt);
+        if (p->wrapLines && p->value && *p->value) {
+            RECT wr = t2; wr.top = cell.top + 4; wr.bottom = cell.bottom - 2;
+            DrawTextWrapC(g, p->value, &wr, vf, vt, p->wrapLines);
+        } else {
+            /* first line only */
+            WCHAR line[256]; int i = 0;
+            const WCHAR* s = p->value ? p->value : L"";
+            while (*s && *s != L'\r' && *s != L'\n' && i < 255) line[i++] = *s++;
+            line[i] = 0;
+            if (*s) { wcscat_s(line, 256, L" \x2026"); }
+            DrawTextC(g, line, &t2, vf, vt);
+        }
         int zx = cell.right - GLYPH_ZONE;
         VLine(g, zx, cell.top, cell.bottom, g->colors[PGC_LINES]);
         RECT er = cell; er.left = zx;
-        DrawTextC(g, L"\x2026", &er, PGF_VALUE, RGB(90, 90, 90));
+        /* on a tall wrapped row keep the glyph on the first line, or it
+           centres itself halfway down and reads as part of the text */
+        if (p->wrapLines) er.bottom = er.top + FontRowPx(g, vf);
+        DrawTextC(g, L"\x2026", &er, vf, RGB(90, 90, 90));
         break;
     }
     default:
-        DrawTextC(g, p->value, &tr, PGF_VALUE, vt);
+        if (p->wrapLines && p->value && *p->value) {
+            RECT wr = tr; wr.right = cell.right - CELL_PAD;
+            wr.top = cell.top + 4; wr.bottom = cell.bottom - 2;
+            DrawTextWrapC(g, p->value, &wr, vf, vt, p->wrapLines);
+        } else {
+            DrawTextC(g, p->value, &tr, vf, vt);
+        }
         break;
     }
 }
@@ -922,19 +1149,19 @@ static void Paint(Grid* g)
     if (!EnsureRT(g)) return;
     if (g->visDirty) RebuildVis(g);
     RECT rc; GetClientRect(g->hwnd, &rc);
-    int rh = RowH(g);
+    int rh = DefRowH(g);
     g->rt->BeginDraw();
     g->rt->Clear(CrToD2D(g->colors[PGC_BACK]));
 
     int viewBottom = rc.bottom - g->descH;
-    int first = g->scrollY / rh;
-    int last = (g->scrollY + viewBottom) / rh + 1;
-    if (last > g->nVis) last = g->nVis;
+    int first = VisIndexAtY(g, g->scrollY);
+    if (first < 0) first = 0;
 
-    for (int vi = first; vi < last; vi++) {
+    for (int vi = first; vi < g->nVis; vi++) {
         VisItem* it = &g->vis[vi];
-        RECT row = { 0, vi * rh - g->scrollY, rc.right, 0 };
-        row.bottom = row.top + rh;
+        RECT row = { 0, it->y - g->scrollY, rc.right, 0 };
+        if (row.top >= viewBottom) break;          /* past the viewport */
+        row.bottom = row.top + it->h;
         if (it->isCat) {
             Cat* c = CAT(g, it->id);
             FillRectC(g, &row, g->colors[PGC_CATBACK]);
@@ -949,7 +1176,7 @@ static void Paint(Grid* g)
                 g->rt->DrawLine(D2D1::Point2F(cx + 2, cy), D2D1::Point2F(cx - 2, cy + 4), g->br, 1.6f);
             }
             RECT tr = row; tr.left = 20;
-            DrawTextC(g, c->name, &tr, PGF_CATEGORY, g->colors[PGC_CATTEXT]);
+            DrawTextC(g, c->name, &tr, HdrFontOf(g, c), g->colors[PGC_CATTEXT]);
             if (!(g->style & PGS_TOOLBOXLOOK))
                 HLine(g, 0, rc.right, row.bottom - 1, g->colors[PGC_LINES]);
         } else {
@@ -967,7 +1194,7 @@ static void Paint(Grid* g)
                 FillRectC(g, &nameR, g->colors[PGC_NAMEBACK]);
             }
             RECT tn = nameR; tn.left += CELL_PAD + (p->cat ? 10 : 4);
-            DrawTextC(g, p->name, &tn, PGF_NAME,
+            DrawTextC(g, p->name, &tn, NameFontOf(g, p),
                 isSel ? g->colors[PGC_SELTEXT] : g->colors[PGC_NAMETEXT]);
             PaintValue(g, p, it->id, cell);
             HLine(g, 0, rc.right, row.bottom - 1, g->colors[PGC_LINES]);
@@ -1123,10 +1350,9 @@ static void KeyNav(Grid* g, int dir)
     } while (g->vis[i].isCat);
     SelectProp(g, g->vis[i].id);
     /* ensure visible */
-    int rh = RowH(g);
     RECT rc; GetClientRect(g->hwnd, &rc);
     int view = rc.bottom - g->descH;
-    int top = i * rh, bot = top + rh;
+    int top = g->vis[i].y, bot = top + g->vis[i].h;
     if (top < g->scrollY) g->scrollY = top;
     if (bot > g->scrollY + view) g->scrollY = bot - view;
     UpdateScroll(g);
@@ -1163,6 +1389,9 @@ static LRESULT CALLBACK GridProc(HWND h, UINT m, WPARAM w, LPARAM l)
             RECT rc; GetClientRect(h, &rc);
             if (g->splitter > rc.right - 60) g->splitter = rc.right - 60;
             if (g->splitter < MIN_SPLIT) g->splitter = MIN_SPLIT;
+            /* a wrapped row's height is a function of the cell width,
+               so a resize changes the layout, not just the painting */
+            if (g->anyWrap) g->visDirty = TRUE;
             UpdateScroll(g);
             InvalidateRect(h, NULL, FALSE);
         }
@@ -1172,7 +1401,7 @@ static LRESULT CALLBACK GridProc(HWND h, UINT m, WPARAM w, LPARAM l)
         CloseEditors(g, TRUE);
         SCROLLINFO si = { sizeof(si), SIF_ALL };
         GetScrollInfo(h, SB_VERT, &si);
-        int pos = g->scrollY, rh = RowH(g);
+        int pos = g->scrollY, rh = DefRowH(g);
         switch (LOWORD(w)) {
         case SB_LINEUP:   pos -= rh; break;
         case SB_LINEDOWN: pos += rh; break;
@@ -1196,7 +1425,7 @@ static LRESULT CALLBACK GridProc(HWND h, UINT m, WPARAM w, LPARAM l)
         if (!g) return 0;
         CloseEditors(g, TRUE);
         int delta = GET_WHEEL_DELTA_WPARAM(w);
-        g->scrollY -= (delta / WHEEL_DELTA) * 3 * RowH(g);
+        g->scrollY -= (delta / WHEEL_DELTA) * 3 * DefRowH(g);
         if (g->scrollY < 0) g->scrollY = 0;
         UpdateScroll(g);
         InvalidateRect(h, NULL, FALSE);
@@ -1251,7 +1480,14 @@ static LRESULT CALLBACK GridProc(HWND h, UINT m, WPARAM w, LPARAM l)
             int s = x;
             if (s < MIN_SPLIT) s = MIN_SPLIT;
             if (s > rc.right - 60) s = rc.right - 60;
-            if (s != g->splitter) { g->splitter = s; InvalidateRect(h, NULL, FALSE); }
+            if (s != g->splitter) {
+                g->splitter = s;
+                if (g->anyWrap) {          /* narrower cell, taller rows */
+                    g->visDirty = TRUE;
+                    UpdateScroll(g);
+                }
+                InvalidateRect(h, NULL, FALSE);
+            }
             return 0;
         }
         if (g->dragSlider) { SliderFromX(g, g->dragSlider, x); return 0; }
@@ -1315,10 +1551,12 @@ static LRESULT CALLBACK GridProc(HWND h, UINT m, WPARAM w, LPARAM l)
         case VK_UP:    KeyNav(g, -1); return 0;
         case VK_DOWN:  KeyNav(g, +1); return 0;
         case VK_PRIOR: { int n = 1; RECT rc; GetClientRect(h, &rc);
-                         n = (rc.bottom - g->descH) / RowH(g);
+                         n = (rc.bottom - g->descH) / DefRowH(g);
+                         if (n < 1) n = 1;
                          for (int i = 0; i < n; i++) KeyNav(g, -1); return 0; }
         case VK_NEXT:  { int n = 1; RECT rc; GetClientRect(h, &rc);
-                         n = (rc.bottom - g->descH) / RowH(g);
+                         n = (rc.bottom - g->descH) / DefRowH(g);
+                         if (n < 1) n = 1;
                          for (int i = 0; i < n; i++) KeyNav(g, +1); return 0; }
         case VK_LEFT:
             if (p && p->type == PGT_SLIDER) { SpinStep(g, g->sel, -1); return 0; }
@@ -1415,24 +1653,29 @@ HPG PGAPI PG_Create(HWND hwndParent, int x, int y, int w, int h,
     g->colors[PGC_SELTEXT]   = RGB(0x14, 0x1A, 0x21);
     g->colors[PGC_DESCBACK]  = RGB(0xF0, 0xF2, 0xF5);
     g->colors[PGC_DESCTEXT]  = RGB(0x3A, 0x42, 0x4C);
-    /* default fonts */
+    /* default fonts - slots 1..4, extras appended by PG_AddFont */
+    g->capFonts = 8;
+    g->fonts = (FontSpec*)calloc(g->capFonts, sizeof(FontSpec));
+    if (!g->fonts) { free(g); return NULL; }
+    g->nFonts = PGF_FIRSTEXTRA;               /* 1..4 in use, next is 5 */
     for (int i = PGF_NAME; i <= PGF_DESC; i++) {
         wcscpy_s(g->fonts[i].face, 64, L"Segoe UI");
         g->fonts[i].sizePt = 9.0f;
     }
     g->fonts[PGF_CATEGORY].bold = TRUE;
+    g->hEditFontId = -1;
     g->descH = (style & PGS_DESCRIPTION) ? 52 : 0;
     HWND hw = CreateWindowExW(0, PG_CLASSNAME, L"",
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL | WS_TABSTOP,
         x, y, w, h, hwndParent, NULL, GetModuleHandleW(NULL), g);
-    if (!hw) { free(g); return NULL; }
+    if (!hw) { free(g->fonts); free(g); return NULL; }
     /* Clarion SHEET/TAB and other native siblings can sit above us in the
        z-order and paint over the grid - pin it to the top of its siblings */
     SetWindowPos(hw, HWND_TOP, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     g->dpi = WindowDpi(hw);
     for (int i = PGF_NAME; i <= PGF_DESC; i++) RebuildFormat(g, i);
-    RebuildEditFont(g);
+    RebuildEditFont(g, PGF_VALUE);
     dbg("PG_Create exit hwnd=%p g=%p dpi=%u", hw, g, g->dpi);
     return (HPG)g;
 }
@@ -1453,8 +1696,9 @@ void PGAPI PG_Destroy(HPG pg)
     }
     for (int i = 0; i < g->nCats; i++) free(g->cats[i].name);
     free(g->props); free(g->cats); free(g->vis);
-    for (int i = PGF_NAME; i <= PGF_DESC; i++)
+    for (int i = PGF_NAME; i < g->nFonts; i++)
         if (g->fonts[i].fmt) g->fonts[i].fmt->Release();
+    free(g->fonts);
     if (g->hEditFont) DeleteObject(g->hEditFont);
     free(g);
 }
@@ -1487,8 +1731,189 @@ void PGAPI PG_SetFont(HPG pg, int part, const char* face, int sizePt,
     f->bold = bold ? TRUE : FALSE;
     f->italic = italic ? TRUE : FALSE;
     RebuildFormat(g, part);
-    if (part == PGF_VALUE) RebuildEditFont(g);
-    if (g->hwnd) { UpdateScroll(g); InvalidateRect(g->hwnd, NULL, FALSE); }
+    if (part == PGF_VALUE) RebuildEditFont(g, PGF_VALUE);
+    if (g->hwnd) { Dirty(g); }          /* the size changed row heights */
+}
+
+/*------------------------------------------------------------------*/
+/* per-category / per-row fonts                                      */
+/*------------------------------------------------------------------*/
+int PGAPI PG_AddFont(HPG pg, const char* face, int sizePt,
+                     int bold, int italic)
+{
+    Grid* g = (Grid*)pg;
+    if (!g || !g->fonts) return 0;
+    WCHAR wface[64];
+    wcscpy_s(wface, 64, g->fonts[PGF_VALUE].face);      /* inherit face */
+    if (face && *face) {
+        WCHAR* w = a2w(face);
+        if (w) { wcsncpy_s(wface, 64, w, _TRUNCATE); free(w); }
+    }
+    float pt = sizePt > 0 ? (float)sizePt : g->fonts[PGF_VALUE].sizePt;
+    BOOL b = bold ? TRUE : FALSE, i2 = italic ? TRUE : FALSE;
+    /* de-dupe: the same font asked for twice is the same id, so a
+       caller may call this once per row without growing the table */
+    for (int i = PGF_NAME; i < g->nFonts; i++) {
+        FontSpec* f = &g->fonts[i];
+        if (f->sizePt == pt && f->bold == b && f->italic == i2 &&
+            _wcsicmp(f->face, wface) == 0)
+            return i;
+    }
+    if (g->nFonts == g->capFonts) {
+        int cap = g->capFonts ? g->capFonts * 2 : 8;
+        FontSpec* nf = (FontSpec*)realloc(g->fonts, cap * sizeof(FontSpec));
+        if (!nf) return 0;
+        memset(nf + g->capFonts, 0, (cap - g->capFonts) * sizeof(FontSpec));
+        g->fonts = nf; g->capFonts = cap;
+    }
+    int id = g->nFonts++;
+    FontSpec* f = &g->fonts[id];
+    memset(f, 0, sizeof(*f));
+    wcscpy_s(f->face, 64, wface);
+    f->sizePt = pt; f->bold = b; f->italic = i2;
+    RebuildFormat(g, id);
+    return id;
+}
+
+/* id of an existing category by name, 0 when there is no such header.
+   AddCategory would CREATE one on a typo; this never does, which is
+   what a "style the category called X" call wants. */
+int PGAPI PG_FindCategory(HPG pg, const char* name)
+{
+    Grid* g = (Grid*)pg;
+    if (!g || !name) return 0;
+    WCHAR* w = a2w(name);
+    if (!w) return 0;
+    int found = 0;
+    for (int i = 0; i < g->nCats; i++) {
+        if (g->cats[i].name && _wcsicmp(g->cats[i].name, w) == 0) {
+            found = i + 1; break;
+        }
+    }
+    free(w);
+    return found;
+}
+
+int PGAPI PG_GetFontCount(HPG pg)
+{
+    Grid* g = (Grid*)pg;
+    return g ? g->nFonts - 1 : 0;          /* highest valid font id */
+}
+
+int PGAPI PG_GetFont(HPG pg, int fontId, char* faceBuf, int bufLen,
+                     int* sizePt, int* bold, int* italic)
+{
+    Grid* g = (Grid*)pg;
+    if (!g || !FontOk(g, fontId)) return 0;
+    FontSpec* f = &g->fonts[fontId];
+    if (faceBuf && bufLen > 0) w2a(f->face, faceBuf, bufLen);
+    if (sizePt) *sizePt = (int)(f->sizePt + 0.5f);
+    if (bold)   *bold   = f->bold   ? 1 : 0;
+    if (italic) *italic = f->italic ? 1 : 0;
+    return 1;
+}
+
+void PGAPI PG_SetCatFont(HPG pg, int category, int hdrFont,
+                         int nameFont, int valueFont)
+{
+    Grid* g = (Grid*)pg;
+    Cat* c = g ? CAT(g, category) : NULL;
+    if (!c) return;
+    c->fontHdr   = FontOk(g, hdrFont)   ? hdrFont   : 0;
+    c->fontName  = FontOk(g, nameFont)  ? nameFont  : 0;
+    c->fontValue = FontOk(g, valueFont) ? valueFont : 0;
+    if (g->hwnd) Dirty(g);
+}
+
+int PGAPI PG_GetCatFont(HPG pg, int category, int* hdrFont,
+                        int* nameFont, int* valueFont)
+{
+    Grid* g = (Grid*)pg;
+    Cat* c = g ? CAT(g, category) : NULL;
+    if (!c) return 0;
+    if (hdrFont)   *hdrFont   = c->fontHdr;
+    if (nameFont)  *nameFont  = c->fontName;
+    if (valueFont) *valueFont = c->fontValue;
+    return 1;
+}
+
+void PGAPI PG_SetRowFont(HPG pg, int row, int nameFont, int valueFont)
+{
+    Grid* g = (Grid*)pg;
+    Prop* p = g ? PROP(g, row) : NULL;
+    if (!p) return;
+    p->fontName  = FontOk(g, nameFont)  ? nameFont  : 0;
+    p->fontValue = FontOk(g, valueFont) ? valueFont : 0;
+    if (g->hwnd) Dirty(g);
+}
+
+int PGAPI PG_GetRowFont(HPG pg, int row, int* nameFont, int* valueFont)
+{
+    Grid* g = (Grid*)pg;
+    Prop* p = g ? PROP(g, row) : NULL;
+    if (!p) return 0;
+    if (nameFont)  *nameFont  = p->fontName;
+    if (valueFont) *valueFont = p->fontValue;
+    return 1;
+}
+
+/* one-call: register (or reuse) the font and hang it on the row */
+int PGAPI PG_SetRowFontFace(HPG pg, int row, int which, const char* face,
+                            int sizePt, int bold, int italic)
+{
+    Grid* g = (Grid*)pg;
+    Prop* p = g ? PROP(g, row) : NULL;
+    if (!p) return 0;
+    int id = PG_AddFont(pg, face, sizePt, bold, italic);
+    if (!id) return 0;
+    if (which == PGF_NAME)       p->fontName  = id;
+    else if (which == PGF_VALUE) p->fontValue = id;
+    else return 0;
+    if (g->hwnd) Dirty(g);
+    return id;
+}
+
+int PGAPI PG_SetCatFontFace(HPG pg, int category, int which, const char* face,
+                            int sizePt, int bold, int italic)
+{
+    Grid* g = (Grid*)pg;
+    Cat* c = g ? CAT(g, category) : NULL;
+    if (!c) return 0;
+    int id = PG_AddFont(pg, face, sizePt, bold, italic);
+    if (!id) return 0;
+    if (which == PGF_NAME)          c->fontName  = id;
+    else if (which == PGF_VALUE)    c->fontValue = id;
+    else if (which == PGF_CATEGORY) c->fontHdr   = id;
+    else return 0;
+    if (g->hwnd) Dirty(g);
+    return id;
+}
+
+void PGAPI PG_SetRowWrap(HPG pg, int row, int maxLines)
+{
+    Grid* g = (Grid*)pg;
+    Prop* p = g ? PROP(g, row) : NULL;
+    if (!p) return;
+    if (maxLines < 0) maxLines = WRAP_MAXLINES;
+    if (maxLines > WRAP_MAXLINES) maxLines = WRAP_MAXLINES;
+    p->wrapLines = maxLines;
+    if (g->hwnd) Dirty(g);
+}
+
+int PGAPI PG_GetRowWrap(HPG pg, int row)
+{
+    Grid* g = (Grid*)pg;
+    Prop* p = g ? PROP(g, row) : NULL;
+    return p ? p->wrapLines : 0;
+}
+
+int PGAPI PG_GetRowHeight(HPG pg, int row)
+{
+    Grid* g = (Grid*)pg;
+    if (!g || !PROP(g, row)) return 0;
+    if (g->visDirty) RebuildVis(g);
+    int vi = VisIndexOfProp(g, row);
+    return vi >= 0 ? g->vis[vi].h : 0;
 }
 
 void PGAPI PG_SetColor(HPG pg, int slot, COLORREF color)
@@ -1504,7 +1929,7 @@ void PGAPI PG_SetRowHeight(HPG pg, int px)
     Grid* g = (Grid*)pg;
     if (!g) return;
     g->rowH = px;
-    if (g->hwnd) { UpdateScroll(g); InvalidateRect(g->hwnd, NULL, FALSE); }
+    if (g->hwnd) Dirty(g);
 }
 
 void PGAPI PG_SetSplitter(HPG pg, int px)
@@ -1646,7 +2071,11 @@ void PGAPI PG_SetValue(HPG pg, int row, const char* value)
     if (g->editProp == row) CommitEdit(g, FALSE);
     WCHAR* w = a2w(value);
     free(p->value); p->value = w;
-    if (g->hwnd) InvalidateRect(g->hwnd, NULL, FALSE);
+    /* a wrapped row is as tall as its text, so new text = new layout */
+    if (g->hwnd) {
+        if (p->wrapLines) Dirty(g);
+        else InvalidateRect(g->hwnd, NULL, FALSE);
+    }
 }
 
 int PGAPI PG_GetValue(HPG pg, int row, char* buf, int bufLen)

@@ -63,6 +63,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmd, int show)
     PG_SetChoices(g_pg, r, "Left|Center|Right");
     r = PG_AddProperty(g_pg, cGen, "Notes", PGT_MULTITEXT, "First line\r\nSecond line");
 
+    /* ---- wrapped, self-sizing rows -------------------------------- */
+    r = PG_AddProperty(g_pg, cGen, "Long note", PGT_MULTITEXT,
+        "This value is far too long for one line, so the row wraps it "
+        "over as many lines as it needs and pushes everything below it "
+        "further down the grid.  Drag the splitter and watch it re-flow.");
+    PG_SetRowWrap(g_pg, r, -1);            /* as many lines as it takes */
+    PG_SetDescription(g_pg, r, "Wrapped row, unlimited lines.");
+    r = PG_AddProperty(g_pg, cGen, "Capped note", PGT_READONLY,
+        "A read-only note capped at two lines: the rest is clipped, but "
+        "the two lines it does show are laid out properly rather than "
+        "trimmed to a single line with an ellipsis.");
+    PG_SetRowWrap(g_pg, r, 2);             /* at most two lines */
+
     int cNum = PG_AddCategory(g_pg, "Numbers");
     r = PG_AddProperty(g_pg, cNum, "Opacity", PGT_SLIDER, "75");
     PG_SetRange(g_pg, r, 0, 100, 5);
@@ -78,6 +91,29 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR cmd, int show)
     r = PG_AddProperty(g_pg, cMisc, "Start time", PGT_TIME, "09:30");
     r = PG_AddProperty(g_pg, cMisc, "Version", PGT_READONLY, "1.0.0");
     r = PG_AddProperty(g_pg, 0, "Apply now", PGT_BUTTON, "Apply");
+
+    /* ---- per-category and per-row fonts --------------------------- */
+    /* the whole "Numbers" category in a mono value font ...           */
+    int fMono = PG_AddFont(g_pg, "Consolas", 10, 0, 0);
+    PG_SetCatFont(g_pg, cNum, PGF_INHERIT, PGF_INHERIT, fMono);
+    /* ... a bigger header on "Appearance" ...                         */
+    PG_SetCatFontFace(g_pg, cMisc, PGF_CATEGORY, "Segoe UI", 13, 1, 0);
+    /* ... and one single row shouting in 14pt bold italic.            */
+    int rBig = PG_FindRow(g_pg, "Name");
+    PG_SetRowFontFace(g_pg, rBig, PGF_VALUE, "Georgia", 14, 1, 1);
+
+    /* read every one of them back out again */
+    {
+        char face[64]; int pt = 0, bold = 0, ital = 0, nf = 0, vf = 0;
+        PG_GetRowFont(g_pg, rBig, &nf, &vf);
+        PG_GetFont(g_pg, vf, face, sizeof(face), &pt, &bold, &ital);
+        char buf[256];
+        wsprintfA(buf, "PropGrid test  [row %d value font: %s %dpt b=%d i=%d,"
+                       " %d fonts, row is %d px]",
+                  rBig, face, pt, bold, ital,
+                  PG_GetFontCount(g_pg), PG_GetRowHeight(g_pg, rBig));
+        SetWindowTextA(h, buf);
+    }
 
     SetTimer(h, 1, 100, NULL);
 

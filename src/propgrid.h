@@ -54,6 +54,11 @@ typedef void* HPG;          /* property-grid instance handle */
 #define PGF_VALUE      2    /* right (value) column / editors         */
 #define PGF_CATEGORY   3    /* category header rows                   */
 #define PGF_DESC       4    /* description pane                       */
+/* PG_AddFont returns extra font ids, always >= 5.  Anywhere a font   */
+/* id is accepted, 0 means "inherit" - a row falls back to its        */
+/* category, a category to the global PGF_ slot above.                */
+#define PGF_INHERIT    0
+#define PGF_FIRSTEXTRA 5
 
 /* ---- color slots for PG_SetColor --------------------------------- */
 #define PGC_BACK        1   /* grid background            (COLORREF)  */
@@ -85,6 +90,63 @@ void  PGAPI PG_SetColor(HPG pg, int slot, COLORREF color);
 void  PGAPI PG_SetRowHeight(HPG pg, int px);      /* 0 = auto from fonts */
 void  PGAPI PG_SetSplitter(HPG pg, int px);       /* name column width   */
 int   PGAPI PG_GetSplitter(HPG pg);
+
+/* ---- per-category / per-row fonts --------------------------------- */
+/* NOT the normal way to style a grid - PG_SetFont above sets the four */
+/* global slots and that is what almost every caller wants.  These are */
+/* here for the case where one category, or one single row, really has */
+/* to carry a different typeface or size.  Row heights adapt on their  */
+/* own (unless PG_SetRowHeight pinned them), so a 14pt row and a 9pt   */
+/* row can sit next to each other without clipping.                    */
+
+/* Register a font and return its id (>= PGF_FIRSTEXTRA), 0 on error.  */
+/* An identical face/size/bold/italic is de-duplicated: asking twice   */
+/* returns the same id, so calling this in a loop is safe.             */
+int   PGAPI PG_AddFont(HPG pg, const char* face, int sizePt,
+                       int bold, int italic);
+/* Highest valid font id (>= PGF_DESC).                                */
+int   PGAPI PG_GetFontCount(HPG pg);
+/* Id of an EXISTING category by name, 0 if there is none.  Unlike     */
+/* PG_AddCategory this never creates one, so styling "the category     */
+/* called X" cannot leave an empty header behind on a typo.            */
+int   PGAPI PG_FindCategory(HPG pg, const char* name);
+/* Read any font back - the four built-in slots included.  Any out     */
+/* pointer may be NULL.  Returns 1 on success, 0 for a bad id.         */
+int   PGAPI PG_GetFont(HPG pg, int fontId, char* faceBuf, int bufLen,
+                       int* sizePt, int* bold, int* italic);
+
+/* Category fonts.  0 / PGF_INHERIT on any argument = fall back to the */
+/* matching global slot.  Applies to every row of that category.       */
+void  PGAPI PG_SetCatFont(HPG pg, int category, int hdrFont,
+                          int nameFont, int valueFont);
+int   PGAPI PG_GetCatFont(HPG pg, int category, int* hdrFont,
+                          int* nameFont, int* valueFont);
+/* Row fonts.  Override the row's category; 0 = inherit it.            */
+void  PGAPI PG_SetRowFont(HPG pg, int row, int nameFont, int valueFont);
+int   PGAPI PG_GetRowFont(HPG pg, int row, int* nameFont, int* valueFont);
+
+/* One-call convenience: register (or reuse) the font and hang it on   */
+/* the row / category in one go.  which = PGF_NAME | PGF_VALUE, and    */
+/* for a category also PGF_CATEGORY for its header.  A NULL/empty face */
+/* or sizePt <= 0 inherits that part from the current font.  Returns   */
+/* the font id used, 0 on error.                                       */
+int   PGAPI PG_SetRowFontFace(HPG pg, int row, int which, const char* face,
+                              int sizePt, int bold, int italic);
+int   PGAPI PG_SetCatFontFace(HPG pg, int category, int which, const char* face,
+                              int sizePt, int bold, int italic);
+
+/* ---- wrapped, multi-line value rows ------------------------------- */
+/* By default a value is one line, trimmed with an ellipsis.  Turn wrap */
+/* on for a row and its text is laid out over as many lines as it needs */
+/* (up to maxLines), the row grows to fit and everything below it moves */
+/* down.  maxLines: 0 = off, n = at most n lines, -1 = as many as it    */
+/* takes (capped internally).  Works on any text row, and is what you   */
+/* want on PGT_MULTITEXT and on a long read-only note.                  */
+/* PG_SetRowHeight still wins: pin a height and rows stay uniform.      */
+void  PGAPI PG_SetRowWrap(HPG pg, int row, int maxLines);
+int   PGAPI PG_GetRowWrap(HPG pg, int row);
+/* Laid-out height of a row in px, 0 if it is not visible.              */
+int   PGAPI PG_GetRowHeight(HPG pg, int row);
 
 /* ---- building the grid ------------------------------------------- */
 void  PGAPI PG_Clear(HPG pg);

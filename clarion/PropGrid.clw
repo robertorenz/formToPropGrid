@@ -72,6 +72,20 @@ PG_FindRow         PROCEDURE(LONG pg, *CSTRING propName),SIGNED,PASCAL,RAW,NAME(
 PG_GetSelected     PROCEDURE(LONG pg),SIGNED,PASCAL,NAME('PG_GetSelected')
 PG_PollEvent       PROCEDURE(LONG pg, *SIGNED row, *SIGNED evType),SIGNED,PASCAL,RAW,NAME('PG_PollEvent')
 PG_Redraw          PROCEDURE(LONG pg),PASCAL,NAME('PG_Redraw')
+!   ---- per-category / per-row fonts, wrapped rows (ordinals 30-41) ----
+PG_AddFont         PROCEDURE(LONG pg, *CSTRING face, SIGNED sizePt, SIGNED bold, SIGNED italic),SIGNED,PROC,PASCAL,RAW,NAME('PG_AddFont')
+PG_GetFontCount    PROCEDURE(LONG pg),SIGNED,PASCAL,NAME('PG_GetFontCount')
+PG_FindCategory    PROCEDURE(LONG pg, *CSTRING name),SIGNED,PASCAL,RAW,NAME('PG_FindCategory')
+PG_GetFont         PROCEDURE(LONG pg, SIGNED fontId, *CSTRING faceBuf, SIGNED bufLen, *SIGNED sizePt, *SIGNED bold, *SIGNED italic),SIGNED,PROC,PASCAL,RAW,NAME('PG_GetFont')
+PG_SetCatFont      PROCEDURE(LONG pg, SIGNED category, SIGNED hdrFont, SIGNED nameFont, SIGNED valueFont),PASCAL,NAME('PG_SetCatFont')
+PG_GetCatFont      PROCEDURE(LONG pg, SIGNED category, *SIGNED hdrFont, *SIGNED nameFont, *SIGNED valueFont),SIGNED,PROC,PASCAL,RAW,NAME('PG_GetCatFont')
+PG_SetRowFont      PROCEDURE(LONG pg, SIGNED row, SIGNED nameFont, SIGNED valueFont),PASCAL,NAME('PG_SetRowFont')
+PG_GetRowFont      PROCEDURE(LONG pg, SIGNED row, *SIGNED nameFont, *SIGNED valueFont),SIGNED,PROC,PASCAL,RAW,NAME('PG_GetRowFont')
+PG_SetRowFontFace  PROCEDURE(LONG pg, SIGNED row, SIGNED which, *CSTRING face, SIGNED sizePt, SIGNED bold, SIGNED italic),SIGNED,PROC,PASCAL,RAW,NAME('PG_SetRowFontFace')
+PG_SetCatFontFace  PROCEDURE(LONG pg, SIGNED category, SIGNED which, *CSTRING face, SIGNED sizePt, SIGNED bold, SIGNED italic),SIGNED,PROC,PASCAL,RAW,NAME('PG_SetCatFontFace')
+PG_SetRowWrap      PROCEDURE(LONG pg, SIGNED row, SIGNED maxLines),PASCAL,NAME('PG_SetRowWrap')
+PG_GetRowWrap      PROCEDURE(LONG pg, SIGNED row),SIGNED,PASCAL,NAME('PG_GetRowWrap')
+PG_GetRowHeight    PROCEDURE(LONG pg, SIGNED row),SIGNED,PASCAL,NAME('PG_GetRowHeight')
     END
   END
 
@@ -267,6 +281,99 @@ PropGridClass.SetRowHeight PROCEDURE(SHORT px)
 PropGridClass.SetSplitter PROCEDURE(SHORT px)
   CODE
   IF SELF.PG THEN PG_SetSplitter(SELF.PG, px).
+
+!---------------------------------------------------------------------
+! per-category / per-row fonts
+!
+! AddFont registers a face/size/bold/italic once and hands back an id;
+! the id is what a category or a row then carries.  Identical fonts are
+! de-duplicated inside the DLL, so calling AddFont in a loop is safe -
+! it returns the same id rather than growing the table.
+!
+! Everything below is deliberately NOT what a normal window does: the
+! four SetFont slots style the whole grid and that is the usual answer.
+! These exist for the row that has to be different.
+!---------------------------------------------------------------------
+PropGridClass.AddFont PROCEDURE(STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)
+cFace CSTRING(128)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  cFace = CLIP(face)
+  RETURN PG_AddFont(SELF.PG, cFace, sizePt, bold, italic)
+
+PropGridClass.FontCount PROCEDURE()
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  RETURN PG_GetFontCount(SELF.PG)
+
+!  FindCategory is AddCategory without the "create it" half: 0 means
+!  there is no header by that name, so styling a category the developer
+!  mistyped quietly does nothing instead of adding an empty header.
+PropGridClass.FindCategory PROCEDURE(STRING catName)
+cName CSTRING(256)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  cName = CLIP(LEFT(catName))
+  RETURN PG_FindCategory(SELF.PG, cName)
+
+PropGridClass.GetFontInfo PROCEDURE(SIGNED fontId, *STRING face, *SIGNED sizePt, *SIGNED bold, *SIGNED italic)
+buf CSTRING(129)
+rc  SIGNED
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  buf = ''
+  rc = PG_GetFont(SELF.PG, fontId, buf, SIZE(buf), sizePt, bold, italic)
+  face = buf
+  RETURN rc
+
+PropGridClass.SetCategoryFont PROCEDURE(SIGNED category, SIGNED hdrFont, SIGNED nameFont, SIGNED valueFont)
+  CODE
+  IF SELF.PG THEN PG_SetCatFont(SELF.PG, category, hdrFont, nameFont, valueFont).
+
+PropGridClass.GetCategoryFont PROCEDURE(SIGNED category, *SIGNED hdrFont, *SIGNED nameFont, *SIGNED valueFont)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  RETURN PG_GetCatFont(SELF.PG, category, hdrFont, nameFont, valueFont)
+
+PropGridClass.SetRowFont PROCEDURE(SIGNED row, SIGNED nameFont, SIGNED valueFont)
+  CODE
+  IF SELF.PG THEN PG_SetRowFont(SELF.PG, row, nameFont, valueFont).
+
+PropGridClass.GetRowFont PROCEDURE(SIGNED row, *SIGNED nameFont, *SIGNED valueFont)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  RETURN PG_GetRowFont(SELF.PG, row, nameFont, valueFont)
+
+PropGridClass.SetRowFontFace PROCEDURE(SIGNED row, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)
+cFace CSTRING(128)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  cFace = CLIP(face)
+  RETURN PG_SetRowFontFace(SELF.PG, row, which, cFace, sizePt, bold, italic)
+
+PropGridClass.SetCategoryFontFace PROCEDURE(SIGNED category, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)
+cFace CSTRING(128)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  cFace = CLIP(face)
+  RETURN PG_SetCatFontFace(SELF.PG, category, which, cFace, sizePt, bold, italic)
+
+!---------------------------------------------------------------------
+! wrapped, self-sizing rows
+!---------------------------------------------------------------------
+PropGridClass.SetRowWrap PROCEDURE(SIGNED row, SIGNED maxLines=-1)
+  CODE
+  IF SELF.PG THEN PG_SetRowWrap(SELF.PG, row, maxLines).
+
+PropGridClass.GetRowWrap PROCEDURE(SIGNED row)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  RETURN PG_GetRowWrap(SELF.PG, row)
+
+PropGridClass.RowHeight PROCEDURE(SIGNED row)
+  CODE
+  IF ~SELF.PG THEN RETURN 0.
+  RETURN PG_GetRowHeight(SELF.PG, row)
 
 !---------------------------------------------------------------------
 ! building

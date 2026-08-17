@@ -40,6 +40,28 @@
   #BOXED('Metrics')
     #PROMPT('&Row height in pixels (0 = automatic from the fonts):',SPIN(@n3,0,200,1)),%PGRowHeight,DEFAULT(0)
     #PROMPT('Splitter (na&me column width) in pixels:',SPIN(@n4,40,2000,10)),%PGSplitter,DEFAULT(150)
+    #DISPLAY('Row height 0 lets every row size itself: a row that carries a')
+    #DISPLAY('bigger font, or that wraps its value, grows and pushes the rows')
+    #DISPLAY('below it down.  Set a height here and rows stay uniform instead.')
+  #ENDBOXED
+  #!
+  #!  Per-category fonts.  The four boxes above set the whole grid; this
+  #!  list overrides one named category.  Categories are matched at run
+  #!  time by NAME through FindCategory, so it works for a category made
+  #!  by the field list, by a lookup, by the actions block or by a TAB -
+  #!  and a name that matches nothing is quietly ignored rather than
+  #!  adding an empty header.
+  #BOXED('Per-category fonts (optional)')
+    #DISPLAY('Leave this empty and every category uses the fonts above.')
+    #DISPLAY('A blank face, or a size of 0, inherits that part.')
+    #BUTTON('Category &fonts...'),MULTI(%PGCatFont,%PGCatFontName & '  ->  ' & %PGCatFontWhich & '  ' & %PGCatFontFace & CHOOSE(%PGCatFontSize = 0,'',' ' & %PGCatFontSize & 'pt')),INLINE
+      #PROMPT('&Category name:',@s64),%PGCatFontName,REQ
+      #PROMPT('&Applies to:',DROP('Value column|Name column|Category header')),%PGCatFontWhich,DEFAULT('Value column')
+      #PROMPT('Fac&e (blank = leave it alone):',@s32),%PGCatFontFace
+      #PROMPT('Si&ze in points (0 = leave it alone):',SPIN(@n3,0,48,1)),%PGCatFontSize,DEFAULT(0)
+      #PROMPT('&Bold',CHECK),%PGCatFontBold,DEFAULT(0),AT(10)
+      #PROMPT('&Italic',CHECK),%PGCatFontItalic,DEFAULT(0),AT(10)
+    #ENDBUTTON
   #ENDBOXED
 #!
 #!-----------------------------------------------------------------------------
@@ -106,6 +128,32 @@
   #IF(%PGSplitter)
     %pObj.SetSplitter(%PGSplitter)
   #ENDIF
+#!  NOTE: the per-category fonts are NOT emitted here.  This group runs
+#!  the moment the grid is created, before a single AddCategory has
+#!  happened, so FindCategory would find nothing.  Each template calls
+#!  %PGEmitCatFonts itself once every category exists.
+#!
+#!-----------------------------------------------------------------------------
+#! %PGEmitCatFonts(object) - the per-category font overrides.
+#!
+#! FindCategory returns 0 for a name that does not exist and
+#! SetCategoryFontFace does nothing with a category of 0, so a mistyped
+#! name is a no-op - no empty header, no error.  The PGF: equate is
+#! written out per branch instead of through a %() group call, because a
+#! group call from inside a #FOR over a MULTI list expands empty and
+#! silently kills the whole enclosing #AT (INSTALL.md section 7).
+#!-----------------------------------------------------------------------------
+#GROUP(%PGEmitCatFonts,%pObj)
+  #FOR(%PGCatFont),WHERE(%PGCatFontName AND (%PGCatFontFace OR %PGCatFontSize OR %PGCatFontBold OR %PGCatFontItalic))
+    #CASE(%PGCatFontWhich)
+    #OF('Category header')
+    %pObj.SetCategoryFontFace(%pObj.FindCategory('%PGCatFontName'),PGF:Category,'%PGCatFontFace',%PGCatFontSize,%PGCatFontBold,%PGCatFontItalic)
+    #OF('Name column')
+    %pObj.SetCategoryFontFace(%pObj.FindCategory('%PGCatFontName'),PGF:Name,'%PGCatFontFace',%PGCatFontSize,%PGCatFontBold,%PGCatFontItalic)
+    #ELSE
+    %pObj.SetCategoryFontFace(%pObj.FindCategory('%PGCatFontName'),PGF:Value,'%PGCatFontFace',%PGCatFontSize,%PGCatFontBold,%PGCatFontItalic)
+    #ENDCASE
+  #ENDFOR
 #!
 #!-----------------------------------------------------------------------------
 #! %PGEditorEquate(editor text) - map the DROP choice to the PGT: equate.

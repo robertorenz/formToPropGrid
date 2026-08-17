@@ -58,6 +58,11 @@ PGF:Name        EQUATE(1)
 PGF:Value       EQUATE(2)
 PGF:Category    EQUATE(3)
 PGF:Desc        EQUATE(4)
+!  AddFont hands out ids from 5 up.  Anywhere a font id is taken, 0
+!  means "inherit": a row falls back to its category, a category to
+!  the matching PGF: slot above.
+PGF:Inherit     EQUATE(0)
+PGF:FirstExtra  EQUATE(5)
 
 !---- color slots ----------------------------------------------------
 PGC:Back        EQUATE(1)
@@ -146,6 +151,31 @@ SetFont         PROCEDURE(SHORT part, STRING face, SHORT sizePt, BYTE bold=0, BY
 SetColor        PROCEDURE(SHORT slot, LONG color)
 SetRowHeight    PROCEDURE(SHORT px)
 SetSplitter     PROCEDURE(SHORT px)
+!-- per-category / per-row fonts.  NOT the usual way to style a grid -
+!-- SetFont above sets the four global slots and that is what almost
+!-- every window wants.  These are here for the case where one
+!-- category, or one single row, really has to carry a different face
+!-- or size.  Row heights follow along on their own.
+AddFont         PROCEDURE(STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0),SIGNED,PROC
+FontCount       PROCEDURE(),SIGNED             ! highest valid font id
+FindCategory    PROCEDURE(STRING catName),SIGNED,PROC  ! 0 = no such header
+GetFontInfo     PROCEDURE(SIGNED fontId, *STRING face, *SIGNED sizePt, *SIGNED bold, *SIGNED italic),BYTE,PROC
+SetCategoryFont PROCEDURE(SIGNED category, SIGNED hdrFont, SIGNED nameFont, SIGNED valueFont)
+GetCategoryFont PROCEDURE(SIGNED category, *SIGNED hdrFont, *SIGNED nameFont, *SIGNED valueFont),BYTE,PROC
+SetRowFont      PROCEDURE(SIGNED row, SIGNED nameFont, SIGNED valueFont)
+GetRowFont      PROCEDURE(SIGNED row, *SIGNED nameFont, *SIGNED valueFont),BYTE,PROC
+!-- one call: register (or reuse) the font AND hang it on the row /
+!-- category.  which = PGF:Name | PGF:Value (| PGF:Category for the
+!-- category header).  Returns the font id it used.
+SetRowFontFace  PROCEDURE(SIGNED row, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0),SIGNED,PROC
+SetCategoryFontFace PROCEDURE(SIGNED category, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0),SIGNED,PROC
+!-- wrapped, self-sizing value rows.  maxLines: 0 = one line + an
+!-- ellipsis (the default), n = wrap over at most n lines, -1 = as
+!-- many as the text needs.  The row grows and the rows below move
+!-- down.  SetRowHeight still wins - pin a height and rows stay level.
+SetRowWrap      PROCEDURE(SIGNED row, SIGNED maxLines=-1)
+GetRowWrap      PROCEDURE(SIGNED row),SIGNED
+RowHeight       PROCEDURE(SIGNED row),SIGNED   ! laid-out height in px
 !-- building --
 ClearAll        PROCEDURE()
 AddCategory     PROCEDURE(STRING catName),SIGNED,PROC

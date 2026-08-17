@@ -1,4 +1,4 @@
-#TEMPLATE(ClaPropGrid,'Direct2D Property Grid [v1.1 2026-08-16 23:05]'),FAMILY('ABC')
+#TEMPLATE(ClaPropGrid,'Direct2D Property Grid [v1.2 2026-08-17 14:17]'),FAMILY('ABC')
 #!=============================================================================
 #!  ClaPropGrid  -  a Direct2D property grid for Clarion 12 (32-bit).
 #!
@@ -29,7 +29,7 @@
 #!  and put propgrid.dll beside the EXE, propgrid.lib where the linker finds
 #!  it.  See INSTALL.md.
 #!
-#!  VERSION 1.1  -  2026-08-16 23:05
+#!  VERSION 1.2  -  2026-08-17 14:17
 #!
 #!  VERSION STAMP - THE CONVENTION.  Every edit to this chain bumps the
 #!  version and refreshes the timestamp, because the #1 support symptom in
@@ -55,7 +55,7 @@
 #SHEET
   #TAB('&General')
     #BOXED('ClaPropGrid')
-      #DISPLAY('Version 1.1 - updated 2026-08-16 23:05')
+      #DISPLAY('Version 1.2 - updated 2026-08-17 14:17')
       #DISPLAY('')
       #DISPLAY('Add this extension ONCE, at the application level.  It places')
       #DISPLAY('PropGridClass in the build (ABC class category PROPGRID) and')
@@ -100,7 +100,7 @@ INCLUDE('PropGrid.inc'),ONCE
   END
 #SHEET
   #TAB('&General')
-    #DISPLAY('Version 1.1 - updated 2026-08-16 23:05')
+    #DISPLAY('Version 1.2 - updated 2026-08-17 14:17')
     #DISPLAY('')
     #BOXED('Object')
       #PROMPT('&Disable this property grid',CHECK),%PGDisable,DEFAULT(0),AT(10)
@@ -145,6 +145,17 @@ INCLUDE('PropGrid.inc'),ONCE
       #ENDENABLE
       #PROMPT('&Read only',CHECK),%PGFieldReadOnly,DEFAULT(0),AT(10)
       #PROMPT('D&escription (shown in the description pane):',@s255),%PGFieldDesc
+      #BOXED('This row on its own')
+        #DISPLAY('Both of these are for the odd row that has to stand out.')
+        #DISPLAY('Leave them alone and the row looks like every other one.')
+        #PROMPT('&Wrap the value over up to N lines (0 = one line):',SPIN(@n2,0,64,1)),%PGFieldWrap,DEFAULT(0)
+        #PROMPT('Name fac&e (blank = the grid font):',@s32),%PGFieldNameFace
+        #PROMPT('Name si&ze (0 = the grid size):',SPIN(@n3,0,48,1)),%PGFieldNameSize,DEFAULT(0)
+        #PROMPT('Name b&old',CHECK),%PGFieldNameBold,DEFAULT(0),AT(10)
+        #PROMPT('Value f&ace (blank = the grid font):',@s32),%PGFieldValFace
+        #PROMPT('Value siz&e (0 = the grid size):',SPIN(@n3,0,48,1)),%PGFieldValSize,DEFAULT(0)
+        #PROMPT('Value bol&d',CHECK),%PGFieldValBold,DEFAULT(0),AT(10)
+      #ENDBOXED
     #ENDBUTTON
   #ENDTAB
 #ENDSHEET
@@ -230,7 +241,20 @@ PGRow:%ActiveTemplateInstance:%PGRowNo LONG                       ! row for %PGF
     #IF(%PGFieldReadOnly)
     %PGObject.SetReadOnly(PGRow:%ActiveTemplateInstance:%PGRowNo,1)
     #ENDIF
+    #! per-row overrides: wrap the value, and/or a font of its own
+    #IF(%PGFieldWrap)
+    %PGObject.SetRowWrap(PGRow:%ActiveTemplateInstance:%PGRowNo,%PGFieldWrap)
+    #ENDIF
+    #IF(%PGFieldNameFace OR %PGFieldNameSize OR %PGFieldNameBold)
+    %PGObject.SetRowFontFace(PGRow:%ActiveTemplateInstance:%PGRowNo,PGF:Name,'%PGFieldNameFace',%PGFieldNameSize,%PGFieldNameBold,0)
+    #ENDIF
+    #IF(%PGFieldValFace OR %PGFieldValSize OR %PGFieldValBold)
+    %PGObject.SetRowFontFace(PGRow:%ActiveTemplateInstance:%PGRowNo,PGF:Value,'%PGFieldValFace',%PGFieldValSize,%PGFieldValBold,0)
+    #ENDIF
   #ENDFOR
+  #! every category exists by now, so the per-category fonts can find
+  #! their headers by name
+  #INSERT(%PGEmitCatFonts,%PGObject)
     #EMBED(%PGAfterInit,'ClaPropGrid: after the grid is built (add your own rows here)'),%ActiveTemplateInstance
     DO PGLoad:%PGObject
   END
@@ -326,7 +350,7 @@ PGSave:%PGObject ROUTINE
 #EXTENSION(FormToPropertyGrid,'Convert form controls to a Property Grid'),PROCEDURE,HLP('~ClaPropGrid.htm')
 #SHEET
   #TAB('&General')
-    #DISPLAY('Version 1.1 - updated 2026-08-16 23:05')
+    #DISPLAY('Version 1.2 - updated 2026-08-17 14:17')
     #DISPLAY('')
     #BOXED('Object')
       #PROMPT('&Disable this template',CHECK),%F2PDisable,DEFAULT(0),AT(10)
@@ -495,6 +519,17 @@ PGSave:%PGObject ROUTINE
         #ENDENABLE
         #PROMPT('&Read only',CHECK),%F2PAddReadOnly,DEFAULT(0),AT(10)
         #PROMPT('D&escription (shown in the description pane):',@s255),%F2PAddDesc
+        #BOXED('This row on its own')
+          #DISPLAY('For the odd row that has to stand out.  Converted controls')
+          #DISPLAY('are styled per CATEGORY instead - see the Appearance tab.')
+          #PROMPT('&Wrap the value over up to N lines (0 = one line):',SPIN(@n2,0,64,1)),%F2PAddWrap,DEFAULT(0)
+          #PROMPT('Name fac&e (blank = the grid font):',@s32),%F2PAddNameFace
+          #PROMPT('Name si&ze (0 = the grid size):',SPIN(@n3,0,48,1)),%F2PAddNameSize,DEFAULT(0)
+          #PROMPT('Name b&old',CHECK),%F2PAddNameBold,DEFAULT(0),AT(10)
+          #PROMPT('Value f&ace (blank = the grid font):',@s32),%F2PAddValFace
+          #PROMPT('Value siz&e (0 = the grid size):',SPIN(@n3,0,48,1)),%F2PAddValSize,DEFAULT(0)
+          #PROMPT('Value bol&d',CHECK),%F2PAddValBold,DEFAULT(0),AT(10)
+        #ENDBOXED
       #ENDBUTTON
     #ENDBOXED
   #ENDTAB
@@ -809,6 +844,16 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
     #IF(%F2PAddReadOnly)
     %F2PObject.SetReadOnly(PGFRow:%ActiveTemplateInstance:%F2PAddNo,1)
     #ENDIF
+    #! per-row overrides, exactly as the control template does them
+    #IF(%F2PAddWrap)
+    %F2PObject.SetRowWrap(PGFRow:%ActiveTemplateInstance:%F2PAddNo,%F2PAddWrap)
+    #ENDIF
+    #IF(%F2PAddNameFace OR %F2PAddNameSize OR %F2PAddNameBold)
+    %F2PObject.SetRowFontFace(PGFRow:%ActiveTemplateInstance:%F2PAddNo,PGF:Name,'%F2PAddNameFace',%F2PAddNameSize,%F2PAddNameBold,0)
+    #ENDIF
+    #IF(%F2PAddValFace OR %F2PAddValSize OR %F2PAddValBold)
+    %F2PObject.SetRowFontFace(PGFRow:%ActiveTemplateInstance:%F2PAddNo,PGF:Value,'%F2PAddValFace',%F2PAddValSize,%F2PAddValBold,0)
+    #ENDIF
   #ENDFOR
   #IF(ITEMS(%F2PAdded))
     DO PGFLoad:%F2PObject                                         ! variables -> the added rows
@@ -828,6 +873,11 @@ PGFRow:%ActiveTemplateInstance:%F2PAddNo LONG                    ! added row for
     HIDE(%F2PCancelCtl)
     #ENDIF
   #ENDIF
+  #! LAST of the building: by now the converted controls, the lookups,
+  #! the added rows, the actions AND every tab category exist, so a
+  #! per-category font can find its header by name whichever of them
+  #! created it.
+  #INSERT(%PGEmitCatFonts,%F2PObject)
     #EMBED(%F2PAfterBuild,'ClaPropGrid (form): after the grid is built (add your own rows here)'),%ActiveTemplateInstance
   #! LAST, after BuildFromWindow, after every AddFileDrop (each of which hides
   #! its own trio) and after the embed above - so a control you UNHIDE there

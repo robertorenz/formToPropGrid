@@ -32,3 +32,18 @@ EXPORTS
     PG_PollEvent       @27
     PG_SetCallback     @28
     PG_Redraw          @29
+;   ---- v1.2: per-category / per-row fonts ----
+    PG_AddFont         @30
+    PG_GetFontCount    @31
+    PG_GetFont         @32
+    PG_SetCatFont      @33
+    PG_GetCatFont      @34
+    PG_SetRowFont      @35
+    PG_GetRowFont      @36
+    PG_SetRowFontFace  @37
+    PG_SetCatFontFace  @38
+;   ---- v1.2: wrapped multi-line value rows ----
+    PG_SetRowWrap      @39
+    PG_GetRowWrap      @40
+    PG_GetRowHeight    @41
+    PG_FindCategory    @42

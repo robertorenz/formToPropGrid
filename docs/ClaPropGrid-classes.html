@@ -73,7 +73,7 @@
 <body>
 <div class="wrap">
   <nav>
-    <div class="brand"><h1>ClaPropGrid</h1><span class="en">Class Guide · PropGridClass · v1.1</span><span class="es">Guía de la clase · PropGridClass · v1.1</span></div>
+    <div class="brand"><h1>ClaPropGrid</h1><span class="en">Class Guide · PropGridClass · v1.2</span><span class="es">Guía de la clase · PropGridClass · v1.2</span></div>
     <a href="#over"><span class="en">Overview</span><span class="es">Resumen</span></a>
     <div class="grp"><span class="en">The object</span><span class="es">El objeto</span></div>
     <a href="#model" class="h2"><span class="en">Object model</span><span class="es">Modelo del objeto</span></a>
@@ -86,6 +86,8 @@
     <div class="grp"><span class="en">Method reference</span><span class="es">Referencia de métodos</span></div>
     <a href="#m-life" class="h2"><span class="en">Lifetime &amp; placement</span><span class="es">Vida y colocación</span></a>
     <a href="#m-look" class="h2"><span class="en">Appearance methods</span><span class="es">Métodos de apariencia</span></a>
+    <a href="#m-fonts" class="h2"><span class="en">Per-category / per-row fonts</span><span class="es">Fuentes por categoría / fila</span></a>
+    <a href="#m-wrap" class="h2"><span class="en">Wrapped rows</span><span class="es">Filas que envuelven</span></a>
     <a href="#m-build" class="h2"><span class="en">Building methods</span><span class="es">Métodos de construcción</span></a>
     <a href="#m-value" class="h2"><span class="en">Value methods</span><span class="es">Métodos de valores</span></a>
     <a href="#m-form" class="h2"><span class="en">Form conversion</span><span class="es">Conversión de formulario</span></a>
@@ -116,7 +118,7 @@
       el orden en que hay que hacer las llamadas y código escrito a mano para cada situación. Redactada a
       partir de <code>PropGrid.inc</code> y <code>PropGrid.clw</code> — las referencias de línea apuntan al
       código fuente entregado.</p>
-      <span class="pill">13 editor types · 3 registries · Direct2D + DirectWrite · run-time form conversion · Clarion 9&#8211;12</span>
+      <span class="pill">13 editor types · 3 registries · per-row fonts · wrapped self-sizing rows · run-time form conversion · Clarion 9&#8211;12</span>
     </header>
 
     <div class="langbar">
@@ -946,6 +948,224 @@ PropGridClass.AddCategory <span class="k">PROCEDURE</span>(<span class="k">STRIN
   </div>
 </section>
 
+<section id="m-fonts">
+  <h2><span class="en">Per-category / per-row fonts</span><span class="es">Fuentes por categoría / fila</span></h2>
+  <div class="en">
+    <p class="lead">The four <code>SetFont</code> slots style the whole grid, and that is what almost every
+    window wants. This is the escape hatch for the case where one category, or one single row, really has
+    to carry a different typeface or size. Row heights follow along on their own.</p>
+
+    <div class="sig">AddFont PROCEDURE(STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="src">clw:277</p>
+    <p>Registers a font and returns its id (5 and up; 1&#8211;4 are the built-in <code>PGF:</code> slots).
+    A blank face or a size of 0 inherits that part from the value slot. Identical fonts are
+    <b>de-duplicated</b> &#8212; asking twice returns the same id &#8212; so calling this once per row in a
+    loop is safe and will not grow the table.</p>
+
+    <div class="sig">SetCategoryFont PROCEDURE(SIGNED category, SIGNED hdrFont, SIGNED nameFont, SIGNED valueFont)</div>
+    <p class="src">clw:305</p>
+    <p>Hangs registered fonts on a category: its header, and the name and value columns of every row in it.
+    <code>PGF:Inherit</code> (0) on any argument falls back to the matching global slot.</p>
+
+    <div class="sig">SetRowFont PROCEDURE(SIGNED row, SIGNED nameFont, SIGNED valueFont)</div>
+    <p class="src">clw:314</p>
+    <p>The same for one row, overriding its category. Resolution is always
+    <b>row &#8594; category &#8594; global slot</b>.</p>
+
+    <div class="sig">SetRowFontFace PROCEDURE(SIGNED row, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC<br>SetCategoryFontFace PROCEDURE(SIGNED category, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="src">clw:323, clw:331</p>
+    <p>One call instead of two: register (or reuse) the font <i>and</i> hang it on the row / category.
+    <code>which</code> is <code>PGF:Name</code> or <code>PGF:Value</code> &#8212; and for a category also
+    <code>PGF:Category</code> for its header. Returns the font id it used.</p>
+
+    <div class="sig">FindCategory PROCEDURE(STRING catName), SIGNED, PROC</div>
+    <p class="src">clw:283</p>
+    <p><code>AddCategory</code> without the "create it" half: <code>0</code> means there is no header by
+    that name. This is what the templates emit, so a category name that matches nothing quietly does
+    nothing instead of leaving an empty header behind.</p>
+
+    <div class="sig">GetRowFont / GetCategoryFont / GetFontInfo / FontCount</div>
+    <p class="src">clw:319, clw:310, clw:288, clw:272</p>
+    <p>The read side. <code>GetRowFont</code> and <code>GetCategoryFont</code> hand back the ids that are
+    set (0 = inheriting); <code>GetFontInfo</code> turns any id &#8212; the four built-in slots included
+    &#8212; back into face, size, bold and italic; <code>FontCount</code> is the highest valid id.</p>
+
+<pre>fMono <span class="k">SIGNED</span>
+Face  <span class="k">STRING</span>(64)
+Pt    <span class="k">SIGNED</span>
+Bold  <span class="k">SIGNED</span>
+Ital  <span class="k">SIGNED</span>
+NameF <span class="k">SIGNED</span>
+ValF  <span class="k">SIGNED</span>
+  <span class="k">CODE</span>
+  <span class="c">! one mono font, used by a whole category's value column</span>
+  fMono = Grid.AddFont(<span class="s">'Consolas'</span>, 10, 0, 0)
+  Grid.SetCategoryFont(cNumbers, <span class="t">PGF:Inherit</span>, <span class="t">PGF:Inherit</span>, fMono)
+
+  <span class="c">! a bigger header on one category, in a single call</span>
+  Grid.SetCategoryFontFace(cNotes, <span class="t">PGF:Category</span>, <span class="s">'Segoe UI'</span>, 12, 1, 0)
+
+  <span class="c">! and one row shouting louder than the rest</span>
+  Grid.SetRowFontFace(rName, <span class="t">PGF:Value</span>, <span class="s">'Georgia'</span>, 14, 1, 1)
+
+  <span class="c">! read it back</span>
+  Grid.GetRowFont(rName, NameF, ValF)
+  Grid.GetFontInfo(ValF, Face, Pt, Bold, Ital)   <span class="c">! -&gt; Georgia 14 1 1</span></pre>
+    <div class="callout warn"><b>Order matters for a category font.</b> The category has to exist first.
+      The templates emit their per-category fonts <i>after</i> everything that can create a header &#8212;
+      the field list, the lookups, the added rows, the actions block and the tab categories &#8212; for
+      exactly this reason.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Las cuatro ranuras de <code>SetFont</code> dan estilo a toda la rejilla, y eso es lo
+    que quiere casi cualquier ventana. Esto es la salida de emergencia para cuando una categoría, o una
+    sola fila, tiene que llevar de verdad otra tipografía u otro tamaño. Los altos de fila se ajustan
+    solos.</p>
+
+    <div class="sig">AddFont PROCEDURE(STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="src">clw:277</p>
+    <p>Registra una fuente y devuelve su id (5 en adelante; 1&#8211;4 son las ranuras <code>PGF:</code>).
+    Una cara en blanco o un tamaño 0 heredan esa parte de la ranura de valores. Las fuentes idénticas se
+    <b>desduplican</b> &#8212; pedirla dos veces devuelve el mismo id &#8212; así que llamarla una vez por
+    fila dentro de un bucle es seguro y no hace crecer la tabla.</p>
+
+    <div class="sig">SetCategoryFont PROCEDURE(SIGNED category, SIGNED hdrFont, SIGNED nameFont, SIGNED valueFont)</div>
+    <p class="src">clw:305</p>
+    <p>Cuelga fuentes registradas de una categoría: su encabezado y las columnas de nombre y valor de todas
+    sus filas. <code>PGF:Inherit</code> (0) en cualquier argumento vuelve a la ranura global
+    correspondiente.</p>
+
+    <div class="sig">SetRowFont PROCEDURE(SIGNED row, SIGNED nameFont, SIGNED valueFont)</div>
+    <p class="src">clw:314</p>
+    <p>Lo mismo para una fila, por encima de su categoría. La resolución siempre es
+    <b>fila &#8594; categoría &#8594; ranura global</b>.</p>
+
+    <div class="sig">SetRowFontFace PROCEDURE(SIGNED row, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC<br>SetCategoryFontFace PROCEDURE(SIGNED category, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="src">clw:323, clw:331</p>
+    <p>Una llamada en vez de dos: registra (o reutiliza) la fuente <i>y</i> la cuelga de la fila o la
+    categoría. <code>which</code> es <code>PGF:Name</code> o <code>PGF:Value</code> &#8212; y en una
+    categoría también <code>PGF:Category</code> para su encabezado. Devuelve el id usado.</p>
+
+    <div class="sig">FindCategory PROCEDURE(STRING catName), SIGNED, PROC</div>
+    <p class="src">clw:283</p>
+    <p><code>AddCategory</code> sin la mitad de "créala": <code>0</code> significa que no hay encabezado con
+    ese nombre. Es lo que emiten las plantillas, para que un nombre de categoría que no coincide con nada
+    no haga nada en vez de dejar un encabezado vacío.</p>
+
+    <div class="sig">GetRowFont / GetCategoryFont / GetFontInfo / FontCount</div>
+    <p class="src">clw:319, clw:310, clw:288, clw:272</p>
+    <p>El lado de lectura. <code>GetRowFont</code> y <code>GetCategoryFont</code> devuelven los ids fijados
+    (0 = heredando); <code>GetFontInfo</code> convierte cualquier id &#8212; incluidas las cuatro ranuras
+    &#8212; de vuelta en cara, tamaño, negrita y cursiva; <code>FontCount</code> es el id válido más
+    alto.</p>
+
+<pre>fMono <span class="k">SIGNED</span>
+Face  <span class="k">STRING</span>(64)
+Pt    <span class="k">SIGNED</span>
+Bold  <span class="k">SIGNED</span>
+Ital  <span class="k">SIGNED</span>
+NameF <span class="k">SIGNED</span>
+ValF  <span class="k">SIGNED</span>
+  <span class="k">CODE</span>
+  <span class="c">! una fuente mono, para la columna de valores de toda una categoría</span>
+  fMono = Grid.AddFont(<span class="s">'Consolas'</span>, 10, 0, 0)
+  Grid.SetCategoryFont(cNumbers, <span class="t">PGF:Inherit</span>, <span class="t">PGF:Inherit</span>, fMono)
+
+  <span class="c">! un encabezado más grande en una categoría, en una sola llamada</span>
+  Grid.SetCategoryFontFace(cNotes, <span class="t">PGF:Category</span>, <span class="s">'Segoe UI'</span>, 12, 1, 0)
+
+  <span class="c">! y una fila que grita más que las demás</span>
+  Grid.SetRowFontFace(rName, <span class="t">PGF:Value</span>, <span class="s">'Georgia'</span>, 14, 1, 1)
+
+  <span class="c">! léalo de vuelta</span>
+  Grid.GetRowFont(rName, NameF, ValF)
+  Grid.GetFontInfo(ValF, Face, Pt, Bold, Ital)   <span class="c">! -&gt; Georgia 14 1 1</span></pre>
+    <div class="callout warn"><b>El orden importa en una fuente de categoría.</b> La categoría tiene que
+      existir antes. Las plantillas emiten sus fuentes por categoría <i>después</i> de todo lo que puede
+      crear un encabezado &#8212; la lista de campos, las búsquedas, las filas agregadas, el bloque de
+      acciones y las categorías de pestaña &#8212; precisamente por esto.</div>
+  </div>
+</section>
+
+<section id="m-wrap">
+  <h2><span class="en">Wrapped rows</span><span class="es">Filas que envuelven</span></h2>
+  <div class="en">
+    <p class="lead">By default a value is one line, trimmed with an ellipsis. Turn wrap on for a row and
+    its text is laid out over as many lines as it needs, the row grows to fit, and every row below it moves
+    down.</p>
+
+    <div class="sig">SetRowWrap PROCEDURE(SIGNED row, SIGNED maxLines=-1)</div>
+    <p class="src">clw:346</p>
+    <table>
+      <tr><th>maxLines</th><th>Behaviour</th></tr>
+      <tr><td><code>0</code></td><td>Off. One line, ellipsis-trimmed &#8212; the default.</td></tr>
+      <tr><td><code>n</code></td><td>Wrap over at most <i>n</i> lines; anything past that is clipped, but
+        the lines it does show are laid out properly.</td></tr>
+      <tr><td><code>-1</code></td><td>As many lines as the text needs, capped internally at 64 so one huge
+        value cannot swallow the grid.</td></tr>
+    </table>
+    <p>Works on any text row. It is what you want on <code>PGT:MultiText</code> and on a long read-only
+    note. The inline editor follows: a wrapped row edits as a multi-line EDIT rather than a single-line
+    one.</p>
+
+    <div class="sig">GetRowWrap PROCEDURE(SIGNED row), SIGNED  ·  RowHeight PROCEDURE(SIGNED row), SIGNED</div>
+    <p class="src">clw:351, clw:356</p>
+    <p><code>RowHeight</code> is the laid-out height in pixels, 0 when the row is not visible &#8212; the
+    measured answer, not a calculation you have to repeat.</p>
+
+<pre>rNote = Grid.AddProperty(cNotes, <span class="s">'Delivery note'</span>, <span class="t">PGT:MultiText</span>, <span class="k">CLIP</span>(ORD:Note))
+Grid.SetRowWrap(rNote, -1)              <span class="c">! grow to fit, however long</span>
+Grid.SetRowWrap(rTerms, 3)              <span class="c">! three lines, then clip</span>
+h = Grid.RowHeight(rNote)               <span class="c">! what it actually came out as</span></pre>
+
+    <div class="callout note"><b>What it costs.</b> A wrapped row is measured with a real DWrite layout, so
+      what you see is what was measured. That also makes the height a function of the <i>cell width</i>:
+      resizing the window or dragging the splitter re-measures and re-flows the whole grid. Rows that do
+      not wrap are unaffected.</div>
+    <div class="callout warn"><b>SetRowHeight still wins.</b> Pin a row height and every row stays that
+      height &#8212; wrapped text is then clipped to it. That is the escape hatch if you want the old
+      uniform look back.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Por defecto un valor es una línea, recortada con puntos suspensivos. Active el envoltura
+    en una fila y su texto se distribuye en tantas líneas como necesite, la fila crece para caber y todas
+    las filas de abajo bajan.</p>
+
+    <div class="sig">SetRowWrap PROCEDURE(SIGNED row, SIGNED maxLines=-1)</div>
+    <p class="src">clw:346</p>
+    <table>
+      <tr><th>maxLines</th><th>Comportamiento</th></tr>
+      <tr><td><code>0</code></td><td>Apagado. Una línea con puntos suspensivos &#8212; el valor por
+        defecto.</td></tr>
+      <tr><td><code>n</code></td><td>Envuelve en como mucho <i>n</i> líneas; lo que pase de ahí se recorta,
+        pero las líneas que sí muestra están bien maquetadas.</td></tr>
+      <tr><td><code>-1</code></td><td>Tantas líneas como haga falta, con un tope interno de 64 para que un
+        valor enorme no se trague la rejilla.</td></tr>
+    </table>
+    <p>Funciona en cualquier fila de texto. Es lo que quiere en <code>PGT:MultiText</code> y en una nota
+    larga de sólo lectura. El editor en línea acompaña: una fila envuelta se edita como un EDIT multilínea
+    en vez de uno de una sola línea.</p>
+
+    <div class="sig">GetRowWrap PROCEDURE(SIGNED row), SIGNED  ·  RowHeight PROCEDURE(SIGNED row), SIGNED</div>
+    <p class="src">clw:351, clw:356</p>
+    <p><code>RowHeight</code> es el alto maquetado en píxeles, 0 si la fila no está visible &#8212; la
+    respuesta medida, no un cálculo que usted tenga que repetir.</p>
+
+<pre>rNote = Grid.AddProperty(cNotes, <span class="s">'Nota de entrega'</span>, <span class="t">PGT:MultiText</span>, <span class="k">CLIP</span>(ORD:Note))
+Grid.SetRowWrap(rNote, -1)              <span class="c">! crece lo que haga falta</span>
+Grid.SetRowWrap(rTerms, 3)              <span class="c">! tres líneas y a recortar</span>
+h = Grid.RowHeight(rNote)               <span class="c">! cómo quedó de alto realmente</span></pre>
+
+    <div class="callout note"><b>Lo que cuesta.</b> Una fila envuelta se mide con un layout real de DWrite,
+      así que lo que ve es lo que se midió. Eso también hace que el alto dependa del <i>ancho de la
+      celda</i>: redimensionar la ventana o arrastrar el divisor vuelve a medir y a redistribuir la
+      rejilla. Las filas que no envuelven no se ven afectadas.</div>
+    <div class="callout warn"><b>SetRowHeight sigue ganando.</b> Fije un alto de fila y todas las filas se
+      quedan con ese alto &#8212; el texto envuelto se recorta a él. Esa es la salida si quiere recuperar
+      el aspecto uniforme de antes.</div>
+  </div>
+</section>
+
 <section id="m-build">
   <h2><span class="en">Building methods</span><span class="es">Métodos de construcción</span></h2>
   <div class="en">
@@ -1543,6 +1763,10 @@ PropGridClass.AddCategory <span class="k">PROCEDURE</span>(<span class="k">STRIN
       <tr><td><code>PGF:Value</code></td><td>2</td><td>Value column font.</td></tr>
       <tr><td><code>PGF:Category</code></td><td>3</td><td>Category header font.</td></tr>
       <tr><td><code>PGF:Desc</code></td><td>4</td><td>Description pane font.</td></tr>
+      <tr><td><code>PGF:Inherit</code></td><td>0</td><td>"Inherit": a row falls back to its category, a
+        category to the slot above.</td></tr>
+      <tr><td><code>PGF:FirstExtra</code></td><td>5</td><td>The first id <code>AddFont</code> hands
+        out.</td></tr>
       <tr><td><code>PGD:Region</code></td><td>0</td><td>Track the REGION in <code>RegionFeq</code>.</td></tr>
       <tr><td><code>PGD:Fill</code></td><td>1</td><td>Fill the client area.</td></tr>
       <tr><td><code>PGD:Left</code></td><td>2</td><td>Dock left, <code>DockSize</code> wide.</td></tr>
@@ -2305,6 +2529,10 @@ MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span
       the IDE, re-register, reopen.</div>
     <h3>See also</h3>
     <ul>
+      <li><code>examples\PropGridDemo</code> — a hand-coded Clarion app that exercises the whole class:
+        every editor type, per-category and per-row fonts, wrapped rows, a converted form with a folded
+        lookup, and tab categories. Run <code>build.bat</code>, then
+        <code>PropGridDemo.exe 1|2|3</code>.</li>
       <li><code>clarion\INSTALL.md</code> — deployment, registration and the measured runtime notes.</li>
       <li><code>clarion\ClaPropGrid.tpl</code> — the three templates and the two prompt-time window
         scans.</li>
@@ -2372,6 +2600,10 @@ MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span
       una copia analizada rancia — cierre el IDE, vuelva a registrar, reabra.</div>
     <h3>Vea también</h3>
     <ul>
+      <li><code>examples\PropGridDemo</code> — una app Clarion escrita a mano que ejercita toda la clase:
+        cada tipo de editor, fuentes por categoría y por fila, filas envueltas, un formulario convertido
+        con una búsqueda plegada y categorías por pestaña. Ejecute <code>build.bat</code> y luego
+        <code>PropGridDemo.exe 1|2|3</code>.</li>
       <li><code>clarion\INSTALL.md</code> — despliegue, registro y las notas medidas de ejecución.</li>
       <li><code>clarion\ClaPropGrid.tpl</code> — las tres plantillas y los dos barridos de ventana en
         tiempo de prompts.</li>
@@ -2383,8 +2615,8 @@ MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span
 
     </div>
     <footer>
-      <span class="en">ClaPropGrid v1.1 · class guide · PropGridClass · Direct2D property grid for Clarion</span>
-      <span class="es">ClaPropGrid v1.1 · guía de la clase · PropGridClass · rejilla de propiedades Direct2D para Clarion</span>
+      <span class="en">ClaPropGrid v1.2 · class guide · PropGridClass · Direct2D property grid for Clarion</span>
+      <span class="es">ClaPropGrid v1.2 · guía de la clase · PropGridClass · rejilla de propiedades Direct2D para Clarion</span>
     </footer>
   </main>
 </div>

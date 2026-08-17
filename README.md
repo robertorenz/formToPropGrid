@@ -38,10 +38,15 @@ the Clarion AppGen through the `ClaPropGrid` template chain (ABC):
    the grid, while tabs the conversion empties are hidden (the SHEET too,
    once its last tab goes).
 
-The templates carry a version stamp (`v1.1 2026-08-16 23:05` in the
+The templates carry a version stamp (`v1.2 2026-08-17 14:17` in the
 registry description and on each template's General tab) — if the prompt
 dialog shows an older stamp than `clarion\ClaPropGrid.tpl`, the IDE is
 serving a stale parsed copy: close the IDE, re-copy, re-register.
+
+**New in v1.2** — per-category and per-row fonts (Appearance tab → *Category
+fonts*, and *This row on its own* on each field / added row), rows that size
+themselves to the font they carry, and values that wrap over several lines and
+push the rest of the grid down.
 
 ![screenshot](docs/screenshot.png)
 
@@ -58,6 +63,17 @@ serving a stale parsed copy: close the IDE, re-copy, re-register.
 - Every color is configurable (`PG_SetColor`); professional steel-blue
   default palette.
 - Optional description pane, border, sorted rows, toolbox look.
+- **Per-category and per-row fonts** — the four global slots style the whole
+  grid, and `AddFont` / `SetCategoryFont` / `SetRowFont` (plus the one-call
+  `SetRowFontFace` / `SetCategoryFontFace`, and getters for all of them)
+  override one category or one single row. Fonts are de-duplicated, so setting
+  them in a loop is free.
+- **Rows size themselves** — a row carrying a bigger font grows, and so does one
+  whose value wraps; everything below moves down. `SetRowHeight` still pins them
+  uniform if you want the old behaviour.
+- **Wrapped multi-line values** — `SetRowWrap(row, n)` lays a long value out
+  over as many lines as it needs (or caps it at *n*), measured with a real
+  DirectWrite layout and re-flowed when the splitter or the window moves.
 - Resizable at runtime (`PG_SetPos` / `PropGridClass.Reposition` tracks a
   placeholder REGION).
 - Events delivered through a poll queue (`PG_PollEvent`, pumped from a
@@ -83,6 +99,7 @@ Open it in a browser; it is a single self-contained file.
 | `bin/` | `propgrid.dll` (32-bit), `testhost.exe`, MSVC import lib |
 | `clarion/` | `PropGrid.inc/.clw` — wrapper class (source, compiles in any Clarion version); `ClaPropGrid.tpl/.tpw` — the template chain; `propgrid.lib` — pre-built Clarion import lib (works in Clarion 9–12); `INSTALL.md` |
 | `docs/` | `ClaPropGrid-classes.html` — the class guide (EN/ES); `screenshot.png` |
+| `examples/` | `PropGridDemo/` — a hand-coded Clarion app exercising the whole class (three windows: every feature, a converted form, tabs) |
 
 The engine is C-style code compiled as C++ purely because the D2D/DWrite COM
 headers are far cleaner that way; the exported surface is a flat C API,
