@@ -63,6 +63,18 @@ serving a stale parsed copy: close the IDE, re-copy, re-register.
 - Events delivered through a poll queue (`PG_PollEvent`, pumped from a
   Clarion TIMER) and/or an immediate C callback.
 
+## Developer reference
+
+`docs/ClaPropGrid-Reference.html` — the full developer documentation: the
+three internal registry QUEUEs (`PropGridLookupQueue`, `PropGridTabQueue`,
+`PropGridCatQueue`) and their invariants, the design-time `MULTI` symbol
+lists that feed them, the complete `PropGridClass` API and equate tables,
+the generated `PGLoad:` / `PGSave:` / `PGPlace:` / `PGFLoad:` / `PGFSave:`
+routines and embed points, worked examples (hand-coded grid, folding a
+lookup trio, deriving the class, converting a tabbed form), and the
+measured Clarion runtime facts the class is built around. Open it in a
+browser; it is a single self-contained file.
+
 ## Repository layout
 
 | Path | Contents |
@@ -70,6 +82,7 @@ serving a stale parsed copy: close the IDE, re-copy, re-register.
 | `src/` | `propgrid.cpp/.h/.def` — the Direct2D engine; `testhost.c` — standalone visual test; `build.bat`; `make-clarion-lib.ps1` — generates the Clarion import lib (no LibMaker needed) |
 | `bin/` | `propgrid.dll` (32-bit), `testhost.exe`, MSVC import lib |
 | `clarion/` | `PropGrid.inc/.clw` — wrapper class (source, compiles in any Clarion version); `ClaPropGrid.tpl/.tpw` — the template chain; `propgrid.lib` — pre-built Clarion import lib (works in Clarion 9–12); `INSTALL.md` |
+| `docs/` | `ClaPropGrid-Reference.html` — developer reference; `screenshot.png` |
 
 The engine is C-style code compiled as C++ purely because the D2D/DWrite COM
 headers are far cleaner that way; the exported surface is a flat C API,
