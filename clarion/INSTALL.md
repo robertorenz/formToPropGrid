@@ -179,6 +179,70 @@ unchanged.
 On the OK button's `EVENT:Accepted` (embedded early, PRIORITY 2000, ahead of the generated
 form logic at 4999) the template emits `Obj.SyncBack()` unless Live sync is on.
 
+#### Lookup trios → one drop-down row (the *Lookups* tab)
+
+The classic Clarion lookup is three controls — `ENTRY(@s3),USE(CUS:DeptCode)`, a `'...'`
+**BUTTON** that opens a select browse, and a **STRING** showing the description. List that
+trio on the **Lookups** tab and the three collapse into a **single `PGT:Drop` row that shows
+the description** and writes the **code** back:
+
+| Prompt | Meaning |
+|---|---|
+| *Code control* (REQ) | the ENTRY holding the code — hidden, tagged on the row, target of every write-back |
+| *Lookup button* | the `'...'` — excluded from the conversion and `HIDE`d (it would otherwise become a button row) |
+| *Description control* | the STRING showing the description — hidden, kept in step with the row |
+| *File* / *Order by key* / *Code field* / *Description field* | the lookup table and its two columns |
+| *Label* / *Category* / *Description* | blank label = the PROMPT in front of the code control; blank category = the default one |
+
+Generated per entry (instance `n`, entry `i`), right after `BuildFromWindow`:
+
+```
+PGFLCode:n:i = ''                                   ! pipe list of codes
+PGFLName:n:i = ''                                   ! pipe list of descriptions
+Relate:Dept.Open()                                  ! reference counted - safe
+PGFLBuf:n = Access:Dept.SaveBuffer()                ! the scan is side effect free
+SET(Dept)                                           ! or SET(<key>) when you pick one
+LOOP
+  IF Access:Dept.Next() THEN BREAK.
+  IF PGFLCnt:n >= Obj.MaxScanItems THEN BREAK.      ! 500 by default
+  ...
+  PGFLCode:n:i = CLIP(PGFLCode:n:i) & '|' & Obj.PipeSafe(DEP:Code)
+  PGFLName:n:i = CLIP(PGFLName:n:i) & '|' & Obj.PipeSafe(DEP:Name)
+END
+Access:Dept.RestoreBuffer(PGFLBuf:n)
+Relate:Dept.Close()
+PGFLRow:n:i = Obj.AddFileDrop(PGFCat:n,'',?DeptCode,?DeptName,CLIP(PGFLCode:n:i),CLIP(PGFLName:n:i),'')
+HIDE(?LookDept)
+```
+
+* `PipeSafe()` CLIPs/LEFTs the value and turns a `'|'` **inside the data** into `'/'`, so a
+  description can never split the list.
+* The lookup file is added to the procedure with `#ADD(%ProcFilesUsed,...)` at
+  `%GatherSymbols`, exactly like ABC's own *Must be in file* validation
+  (`ABUPDATE.TPW:112`), so ABC opens it at Init PRIORITY 7500 and closes it in Kill. The
+  explicit `Relate:x.Open()/Close()` pair around the scan is safe on top of that —
+  `FileManager.Opened` is a **counter** (`ABFILE.CLW:899`).
+* `SaveBuffer()`/`RestoreBuffer()` mean the scan cannot disturb a record the form already
+  loaded — important when the description control's USE variable *is* a field of the lookup
+  file.
+* Matching code → description is case-insensitive, blank-tolerant and, when both sides are
+  numeric, **value**-tolerant (`1` finds `001`, `30` finds `30` from an `@n4` ENTRY). An
+  unmatched code is shown raw and never overwritten.
+* The row is read back by `SyncRow` (description → ordinal → code → `CHANGE(?code)` plus the
+  description control) and refreshed by `SyncFrom` (code → description).
+* **Lookup rows are appended after the automatically converted rows**, because
+  `BuildFromWindow` runs first. Give them their own *Category* if you want them grouped.
+* This reads the whole table once, at window-open time — it suits code tables, not files with
+  thousands of records. Leave the browse button alone for those.
+
+#### The browse button that is still there
+
+Any button row (including a `'...'` you did **not** convert) POSTs `EVENT:Accepted` to the
+real control. After it returns — the lookup browse has written a new code into the USE
+variable — `PropGridClass` refreshes the grid by itself: `TakeButton` arms
+`PendingSyncFrom = 2` and the second `TakeEvent` after that calls `SyncFrom()`. So a
+conventional lookup keeps working *and* the grid stops showing the old code.
+
 Control types it converts: `ENTRY`, `SPIN`, `SLIDER`, `CHECK`, `OPTION` (+RADIO children),
 drop-down `LIST`/`COMBO`, `TEXT`, `BUTTON`, `STRING`/`PROMPT` (read-only rows when added
 explicitly). It deliberately skips a **plain browse LIST** (no `DROP` attribute), plus
@@ -201,6 +265,10 @@ contradict the obvious reading of the docs. Change the class at your peril.
 | `PROP:Checked` is **read only** — writing it does nothing | CHECK write-back is `CHANGE(feq, PROP:TrueValue / PROP:FalseValue)`, defaulting to `1`/`0` |
 | `PROP:From` reads back only for a **string** `FROM('a\|b')`; a queue-driven DROP returns blank | a queue DROP is enumerated by walking `PROP:Selected` 1..`PROP:Items` and reading `CONTENTS` |
 | `PROP:Use` returns the USE variable's **value**, not its name | labels come from the preceding PROMPT/STRING, or the control's caption, else `'Field <feq>'` |
+| `PROP:Use` on a control whose USE is only a field equate (`STRING('Caption'),USE(?SCap)`) reads back **blank** — indistinguishable from an empty USE variable | "has this control a USE variable?" is answered by *writing*: `SetNameControl()` does `CHANGE()` then compares `CONTENTS()`, and only falls back to `PROP:Text` when they disagree |
+| `CHANGE(?captionString,'x')` sets **no** error and changes nothing; `PROP:Text` is the only way in | see above |
+| A `POST(EVENT:Accepted, feq)` issued from inside `TakeEvent` is processed **before** the next `EVENT:Timer` (measured: handler at tick 0, next timer tick 1) | `PendingSyncFrom` still counts **2** ticks, because an `EVENT:Timer` may already be queued behind the POST |
+| `FileManager.Opened` is a counter (`ABFILE.CLW:899`) | the generated `Relate:x.Open()/Close()` pair around a lookup scan cannot close a file ABC still needs |
 | A designer "drop list" is a `LIST` with `DROP()`; `PROP:Type` is `CREATE:list` (14), not `CREATE:droplist` | `PROP:Drop` is what distinguishes a drop-down from a browse list |
 | Every property read/write above still works after `feq{PROP:Hide} = TRUE` | hiding the originals does not break SyncBack |
 
@@ -227,10 +295,37 @@ C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe myapp.cwproj ^
 ```
 
 TXA gotcha worth writing down: a repeating `#BUTTON(...),MULTI(%list,%desc)` list is stored as
-`%list MULTI DEFAULT ('1','2')` with its children as
-`%child DEPEND %list <type> TIMES n` — and the `WHEN` keys must be **unquoted integers**
-(`WHEN  (1) ('?OK')`). A quoted key (`WHEN ('1') ...`) corrupts the `.app`, after which
-`-ag` reports *"cannot be load. Probably it has an invalid format"*.
+`%list MULTI LONG  (1, 2)` — the **list of row keys** — with its children as
+`%child DEPEND %list <type> TIMES n` followed by one `WHEN  (<key>) ('value')` line per row.
+The `WHEN` keys must be **unquoted integers**; a quoted key (`WHEN ('1') ...`) corrupts the
+`.app`, after which `-ag` reports *"cannot be load. Probably it has an invalid format"*.
+
+Two more measured `-ai` rules, learned the hard way while testing the Lookups list:
+
+* the number of keys in `(1, 2)` decides how many rows survive — `WHEN` entries whose key is
+  not in that list are silently discarded (a list written as `(2)` with `TIMES 2` keeps only
+  row 2);
+* **a MULTI list that the currently registered template declares is validated on import, and
+  rows that fail validation are dropped without a message** — hand-written rows for a *new*
+  repeating prompt import cleanly when the *previous* template version (the one without those
+  prompts) is registered, because unknown prompts are stored verbatim. Register the new
+  template afterwards and `-ag` picks the values up. That is the reliable headless recipe for
+  testing a new `MULTI` list:
+
+```
+ClarionCL -tu ClaPropGrid                       :: back to the OLD chain
+ClarionCL -tr <old path>\ClaPropGrid.tpl
+ClarionCL -win -au -ax app.app a.txa            :: export, paste the new %prompts in
+ClarionCL -win -au -ai app.app a.txa            :: import (stored verbatim)
+ClarionCL -tu ClaPropGrid                       :: switch to the NEW chain
+ClarionCL -tr <new path>\ClaPropGrid.tpl
+ClarionCL -win -au -ag app.app                  :: generate, then read the .clw
+```
+
+And a template-language trap: inside `#FOR(%SomeMultiList)`, a `%(%MyGroup())` call that
+reads the list's child symbols comes back **empty**. Compute the value with `#SET` into a
+symbol declared in `#ATSTART` and emit `%MySymbol` instead — that is what the Lookups code
+does for the category variable and the description control.
 
 ## 8. Troubleshooting
 
@@ -244,3 +339,6 @@ TXA gotcha worth writing down: a repeating `#BUTTON(...),MULTI(%list,%desc)` lis
 | The grid is created but stays blank | the window has no timer — set the template's *Timer interval* above 0, or give the window `TIMER()` |
 | Grid edits never reach the variables | Live sync off **and** no OK button resolved; turn Live sync on or call `SyncBack()` / `DO PGSave:<object>` yourself |
 | `… is unresolved for export` in a data DLL | a stale `.inc` with a bare `!ABCIncludeFile` on the redirection path — this one carries `!ABCIncludeFile(PROPGRID)` |
+| A lookup drop-down row shows the raw code instead of a description | the code is not in the scanned list — the table has more rows than `MaxScanItems`, the code field on the form and in the file differ in type/padding, or the record was added after the window opened |
+| A lookup row's drop-down is empty | the lookup file was empty, or `Relate:<file>` could not open — check the file is in the app (the template adds it to the procedure automatically, but the *table* must exist in the dictionary) |
+| The grid still shows the old code after a `'...'` browse | the window has no timer: `PendingSyncFrom` is counted down inside `TakeEvent`, which only runs on `EVENT:Timer` |

@@ -17,6 +17,20 @@
 !     CHANGE(feq, PROP:TrueValue / PROP:FalseValue), defaulting to 1/0.
 !   * PROP:From reads back only for a string FROM(); a queue-driven
 !     DROP is enumerated by walking PROP:Selected 1..PROP:Items.
+!   * PROP:Use gives back the USE variable's VALUE, not its name, and a
+!     control whose USE is only a field equate reads back BLANK - so
+!     "does this control have a USE variable?" cannot be answered by
+!     asking.  SetNameControl() writes with CHANGE() and then VERIFIES
+!     with CONTENTS(); only when they disagree does it fall back to
+!     PROP:Text.  (Measured: CHANGE() on a caption STRING sets no error
+!     and changes nothing; on a STRING(@s30),USE(var) it sets var.)
+!   * A grid BUTTON row POSTs EVENT:Accepted to the real control, and
+!     that POSTed event is processed BEFORE the next EVENT:Timer reaches
+!     TakeEvent (measured: the button handler ran on tick 0, the timer
+!     tick after it was tick 1).  The lookup a button opens runs while
+!     this ACCEPT loop is suspended, so PendingSyncFrom counts TWO ticks
+!     before calling SyncFrom() - one tick would be enough in the common
+!     case but not if EVENT:Timer was already queued.
 !=====================================================================
   MEMBER
 
@@ -80,6 +94,8 @@ PropGridClass.Construct PROCEDURE()
   SELF.TimerInterval = 10
   SELF.MaxScanItems  = 500
   SELF.NextPrompt    = 0
+  SELF.PendingSyncFrom = 0
+  SELF.Lookups      &= NEW(PropGridLookupQueue)
 
 PropGridClass.Destruct PROCEDURE()
   CODE
@@ -88,6 +104,11 @@ PropGridClass.Destruct PROCEDURE()
     SELF.PG = 0
   END
   SELF.Initialized = 0
+  IF ~SELF.Lookups &= NULL
+    FREE(SELF.Lookups)
+    DISPOSE(SELF.Lookups)
+    SELF.Lookups &= NULL
+  END
 
 !---------------------------------------------------------------------
 ! lifetime
@@ -137,7 +158,8 @@ PropGridClass.Kill PROCEDURE()
     PG_Destroy(SELF.PG)
     SELF.PG = 0
   END
-  SELF.Initialized = 0
+  SELF.Initialized     = 0
+  SELF.PendingSyncFrom = 0
 
 PropGridClass.SetDock PROCEDURE(BYTE mode, SIGNED size=0, SIGNED marginX=0, SIGNED marginY=0)
   CODE
@@ -229,6 +251,8 @@ PropGridClass.SetSplitter PROCEDURE(SHORT px)
 !---------------------------------------------------------------------
 PropGridClass.ClearAll PROCEDURE()
   CODE
+  IF ~SELF.Lookups &= NULL THEN FREE(SELF.Lookups).   ! the rows they describe are going
+  SELF.PendingSyncFrom = 0
   IF SELF.PG THEN PG_Clear(SELF.PG).
 
 PropGridClass.AddCategory PROCEDURE(STRING catName)
@@ -450,7 +474,10 @@ excl       STRING(1024)
     ctype = feq{PROP:Type}
     IF ~ctype THEN CYCLE.
     IF feq = SELF.RegionFeq THEN CYCLE.
-    IF excl <> '' AND INSTRING('|' & feq & '|', excl, 1, 1) THEN CYCLE.
+    IF excl <> '' AND INSTRING('|' & feq & '|', excl, 1, 1)
+      labelFeq = 0                                 ! do NOT let the next control
+      CYCLE                                        ! steal (and hide) this one's prompt
+    END
     IF feq{PROP:Hide} THEN CYCLE.
     CASE ctype
     OF CREATE:prompt OROF CREATE:string OROF CREATE:sstring
@@ -482,22 +509,94 @@ excl       STRING(1024)
   RETURN added
 
 !---------------------------------------------------------------------
+! AddFileDrop - fold a "lookup trio" (code ENTRY + '...' BUTTON +
+! description STRING) into ONE drop-down row that shows the DESCRIPTION
+! and writes the CODE back.
+!
+!   codes / names  parallel pipe lists, one item per lookup-file record
+!                  ('D01|D02'  /  'Sales|Support').  Build them with
+!                  PipeSafe() so a '|' inside the data cannot split them.
+!   codeFeq        the real ENTRY - hidden here, tagged on the row, and
+!                  the target of every write-back.
+!   nameFeq        the description control - hidden here, kept in step.
+!   label          '' = take the PROMPT/STRING in front of codeFeq.
+!
+! The '...' BUTTON is NOT touched: the caller (the template) hides it,
+! because a lookup row makes it redundant.
+!---------------------------------------------------------------------
+PropGridClass.AddFileDrop PROCEDURE(SIGNED category, STRING label, SIGNED codeFeq, SIGNED nameFeq, |
+                                    STRING codes, STRING names, <STRING description>)
+row  SIGNED
+ord  SIGNED
+lfeq SIGNED
+code STRING(256)
+val  STRING(256)
+cap  STRING(256)
+  CODE
+  IF ~SELF.PG OR ~codeFeq THEN RETURN 0.
+  cap = CLIP(LEFT(label))
+  SETTARGET(SELF.Win)
+  code = CONTENTS(codeFeq)                         ! CONTENTS is the RAW value
+  lfeq = SELF.PrevLabelFeq(codeFeq, nameFeq)
+  IF cap = '' THEN cap = SELF.ControlLabel(codeFeq, lfeq).
+  codeFeq{PROP:Hide} = TRUE                        ! the drop row replaces the trio
+  IF nameFeq THEN nameFeq{PROP:Hide} = TRUE.
+  IF SELF.HideOriginals AND lfeq THEN lfeq{PROP:Hide} = TRUE.
+  SETTARGET()
+  ord = SELF.PipeFind(codes, code)
+  IF ord
+    val = SELF.PipeItem(names, ord)
+  ELSE
+    val = CLIP(LEFT(code))                         ! unknown code - show it raw
+  END
+  row = SELF.AddProperty(category, cap, PGT:Drop, val)
+  IF ~row THEN RETURN 0.
+  SELF.SetChoices(row, names)
+  SELF.SetTag(row, codeFeq)                        ! SyncRow/SyncFrom find the control here
+  IF ~OMITTED(description)
+    IF CLIP(description) <> '' THEN SELF.SetDescription(row, description).
+  END
+  IF SELF.Lookups &= NULL THEN SELF.Lookups &= NEW(PropGridLookupQueue).
+  CLEAR(SELF.Lookups)
+  SELF.Lookups.Row     = row
+  SELF.Lookups.CodeFeq = codeFeq
+  SELF.Lookups.NameFeq = nameFeq
+  SELF.Lookups.Codes   = codes
+  SELF.Lookups.Names   = names
+  ADD(SELF.Lookups)
+  IF ord AND nameFeq
+    SETTARGET(SELF.Win)
+    SELF.SetNameControl(nameFeq, val)
+    SETTARGET()
+  END
+  RETURN row
+
+!---------------------------------------------------------------------
 ! SyncRow - copy one grid value back into the source control / USE var
 !---------------------------------------------------------------------
 PropGridClass.SyncRow PROCEDURE(SIGNED row)
 feq   SIGNED
 val   STRING(4096)
-pic   STRING(64)
 tv    STRING(64)
 fv    STRING(64)
 ctype LONG
 ord   SIGNED
-lv    LONG
   CODE
   IF ~SELF.PG THEN RETURN.
   feq = SELF.GetTag(row)
   IF ~feq THEN RETURN.
   val = SELF.GetValue(row)
+  IF SELF.FindLookup(row)                          ! a lookup row: name -> code
+    ord = SELF.PipeFind(SELF.Lookups.Names, val)
+    IF ~ord THEN RETURN.                           ! not one of the choices - leave it
+    SETTARGET(SELF.Win)
+    SELF.WriteControl(SELF.Lookups.CodeFeq, SELF.PipeItem(SELF.Lookups.Codes, ord))
+    IF SELF.Lookups.NameFeq
+      SELF.SetNameControl(SELF.Lookups.NameFeq, SELF.PipeItem(SELF.Lookups.Names, ord))
+    END
+    SETTARGET()
+    RETURN
+  END
   SETTARGET(SELF.Win)
   ctype = feq{PROP:Type}
   CASE ctype
@@ -519,14 +618,7 @@ lv    LONG
       CHANGE(feq, CLIP(val))
     END
   OF CREATE:entry OROF CREATE:spin OROF CREATE:singleline
-    pic = SELF.ControlPicture(feq)
-    CASE UPPER(SUB(pic,2,1))
-    OF 'D' OROF 'T'
-      lv = DEFORMAT(CLIP(LEFT(val)), pic)           ! LONG keeps CHANGE() exact
-      CHANGE(feq, lv)
-    ELSE
-      CHANGE(feq, CLIP(val))
-    END
+    SELF.WriteControl(feq, val)
   OF CREATE:button OROF CREATE:string OROF CREATE:sstring OROF CREATE:prompt
     !- nothing to write back for these -
   ELSE
@@ -547,6 +639,7 @@ PropGridClass.SyncFrom PROCEDURE()
 i     SIGNED
 cnt   SIGNED
 feq   SIGNED
+ord   SIGNED
 val   STRING(4096)
 pic   STRING(64)
 lv    LONG
@@ -556,6 +649,24 @@ lv    LONG
   LOOP i = 1 TO cnt
     feq = SELF.GetTag(i)
     IF ~feq THEN CYCLE.
+    IF SELF.FindLookup(i)                          ! a lookup row: code -> name
+      SETTARGET(SELF.Win)
+      val = CONTENTS(SELF.Lookups.CodeFeq)
+      SETTARGET()
+      ord = SELF.PipeFind(SELF.Lookups.Codes, val)
+      IF ord
+        val = SELF.PipeItem(SELF.Lookups.Names, ord)
+        IF SELF.Lookups.NameFeq
+          SETTARGET(SELF.Win)
+          SELF.SetNameControl(SELF.Lookups.NameFeq, val)
+          SETTARGET()
+        END
+      ELSE
+        val = CLIP(LEFT(val))                      ! unknown code - show it raw
+      END
+      SELF.SetValue(i, val)
+      CYCLE
+    END
     val = ''
     SETTARGET(SELF.Win)
     CASE feq{PROP:Type}
@@ -594,6 +705,17 @@ handled BYTE
 guard   SIGNED
   CODE
   IF ~SELF.PG THEN RETURN 0.
+!  A grid BUTTON row POSTs EVENT:Accepted to the real control (TakeButton)
+!  and arms this countdown.  The POSTed event - and, for a lookup button,
+!  the whole browse it opens - is processed while this ACCEPT loop is
+!  suspended, so by the time the SECOND timer tick gets here the USE
+!  variables hold whatever the lookup wrote and the grid can be refreshed.
+!  One tick is NOT enough: the POSTed event may still be queued behind the
+!  EVENT:Timer that is being handled right now.
+  IF SELF.PendingSyncFrom
+    SELF.PendingSyncFrom -= 1
+    IF ~SELF.PendingSyncFrom THEN SELF.SyncFrom().
+  END
   handled = 0
   guard   = 0
   LOOP
@@ -622,7 +744,10 @@ PropGridClass.TakeButton PROCEDURE(SIGNED row)
 feq SIGNED
   CODE
   feq = SELF.GetTag(row)
-  IF feq THEN POST(EVENT:Accepted, feq).
+  IF feq
+    POST(EVENT:Accepted, feq)
+    SELF.PendingSyncFrom = 2                       ! see TakeEvent: refresh AFTER it ran
+  END
 
 PropGridClass.TakeSelect PROCEDURE(SIGNED row)
   CODE
@@ -686,11 +811,7 @@ ch  SIGNED
     IF ~ch THEN BREAK.
     IF ch{PROP:Type} = CREATE:radio
       n += 1
-      IF n > 1
-        res = CLIP(res) & '|' & CLIP(SELF.ControlLabel(ch, 0))
-      ELSE
-        res = CLIP(SELF.ControlLabel(ch, 0))
-      END
+      SELF.PipeAppend(res, SELF.ControlLabel(ch, 0), n)
     END
   END
   RETURN CLIP(res)
@@ -745,11 +866,7 @@ sOrd SIGNED
   sTxt = CONTENTS(feq)
   LOOP i = 1 TO n
     feq{PROP:Selected} = i
-    IF i > 1
-      res = CLIP(res) & '|' & CLIP(CONTENTS(feq))
-    ELSE
-      res = CLIP(CONTENTS(feq))
-    END
+    SELF.PipeAppend(res, CONTENTS(feq), i)
   END
   IF sOrd > 0
     feq{PROP:Selected} = sOrd
@@ -773,4 +890,179 @@ sOrd SIGNED
     END
   END
   IF sOrd > 0 THEN feq{PROP:Selected} = sOrd.
+  RETURN 0
+
+!---------------------------------------------------------------------
+! WriteControl - the ENTRY / SPIN write-back rule, in one place:
+! an @D / @T picture round-trips through a LONG (CHANGE() with a REAL
+! loses the decimal point), everything else goes back as plain text.
+! Assumes SETTARGET(SELF.Win) is active.
+!---------------------------------------------------------------------
+PropGridClass.WriteControl PROCEDURE(SIGNED feq, STRING val)
+pic STRING(64)
+lv  LONG
+  CODE
+  IF ~feq THEN RETURN.
+  pic = SELF.ControlPicture(feq)
+  CASE UPPER(SUB(pic,2,1))
+  OF 'D' OROF 'T'
+    lv = DEFORMAT(CLIP(LEFT(val)), pic)             ! LONG keeps CHANGE() exact
+    CHANGE(feq, lv)
+  ELSE
+    CHANGE(feq, CLIP(val))
+  END
+
+!---------------------------------------------------------------------
+! PrevLabelFeq - the PROMPT / STRING that labels the control at feq, i.e.
+! the nearest one DECLARED before it (skipFeq, the description control,
+! is stepped over).  Anything else in the way means the control has no
+! label of its own.  Assumes SETTARGET(SELF.Win) is active.
+!---------------------------------------------------------------------
+PropGridClass.PrevLabelFeq PROCEDURE(SIGNED feq, SIGNED skipFeq)
+i SIGNED
+n SIGNED
+t LONG
+  CODE
+  IF feq < 2 THEN RETURN 0.
+  n = 0
+  LOOP i = feq - 1 TO 1 BY -1
+    n += 1
+    IF n > 32 THEN BREAK.                           ! the label is never far away
+    IF i = skipFeq THEN CYCLE.
+    t = i{PROP:Type}
+    IF ~t THEN CYCLE.                               ! no such control - keep walking
+    CASE t
+    OF CREATE:prompt OROF CREATE:string OROF CREATE:sstring
+      RETURN i
+    END
+    BREAK                                           ! a real control - give up
+  END
+  RETURN 0
+
+!---------------------------------------------------------------------
+! SetNameControl - put txt into the description control.
+!
+! There is NO reliable way to ask a control whether it has a USE
+! VARIABLE: PROP:Use gives back the variable's VALUE (blank for a
+! field-equate-only USE, but also blank for an empty variable).  So the
+! write is done and then VERIFIED: CHANGE() first - that is what a form
+! saves - and only when CONTENTS() disagrees is the control a caption
+! with nothing behind it, which takes PROP:Text instead.
+! Assumes SETTARGET(SELF.Win) is active.
+!---------------------------------------------------------------------
+PropGridClass.SetNameControl PROCEDURE(SIGNED feq, STRING txt)
+want STRING(256)
+  CODE
+  IF ~feq THEN RETURN.
+  want = CLIP(LEFT(txt))
+  CHANGE(feq, want)
+  IF CLIP(LEFT(CONTENTS(feq))) = CLIP(want) THEN RETURN.
+  CASE feq{PROP:Type}                              ! no USE variable behind it
+  OF CREATE:string OROF CREATE:sstring OROF CREATE:prompt
+    feq{PROP:Text} = CLIP(want)
+  END
+
+!---------------------------------------------------------------------
+! pipe-delimited list helpers
+!---------------------------------------------------------------------
+PropGridClass.PipeAppend PROCEDURE(*STRING list, STRING value, SIGNED itemNo)
+  CODE
+  IF itemNo > 1
+    list = CLIP(list) & '|' & CLIP(value)
+  ELSE
+    list = CLIP(value)                              ! item 1 may legitimately be blank
+  END
+
+PropGridClass.PipeSafe PROCEDURE(STRING txt)
+s STRING(256)
+p SIGNED
+  CODE
+  s = CLIP(LEFT(txt))                               ! numerics arrive right justified
+  LOOP
+    p = INSTRING('|', s, 1, 1)
+    IF ~p THEN BREAK.
+    s[p : p] = '/'                                  ! a '|' in the DATA would split the list
+  END
+  RETURN CLIP(s)
+
+PropGridClass.PipeItem PROCEDURE(STRING list, SIGNED ordinal)
+s  STRING(4096)
+p1 SIGNED
+p2 SIGNED
+n  SIGNED
+  CODE
+  IF ordinal < 1 THEN RETURN ''.
+  s  = list
+  p1 = 1
+  n  = 0
+  LOOP
+    n += 1
+    IF n > 4096 THEN BREAK.
+    p2 = INSTRING('|', s, 1, p1)
+    IF n = ordinal
+      IF p2
+        RETURN CLIP(SUB(s, p1, p2 - p1))
+      ELSE
+        RETURN CLIP(SUB(s, p1, SIZE(s) - p1 + 1))
+      END
+    END
+    IF ~p2 THEN BREAK.
+    p1 = p2 + 1
+    IF p1 > SIZE(s) THEN BREAK.
+  END
+  RETURN ''
+
+!  PipeFind - ordinal of value inside list, 0 when it is not there.
+!  Case insensitive, blank tolerant, and - when BOTH sides are numeric -
+!  value tolerant too, so '1' finds '001' and '1.00' finds '1'.  An exact
+!  text match always wins over a numeric one.
+PropGridClass.PipeFind PROCEDURE(STRING list, STRING value)
+s     STRING(4096)
+item  STRING(256)
+want  STRING(256)
+p1    SIGNED
+p2    SIGNED
+n     SIGNED
+hit   SIGNED
+isnum BYTE
+  CODE
+  want = UPPER(CLIP(LEFT(value)))
+  IF want = '' THEN RETURN 0.
+  s = list
+  IF CLIP(s) = '' THEN RETURN 0.
+  isnum = NUMERIC(CLIP(want))
+  hit   = 0
+  p1    = 1
+  n     = 0
+  LOOP
+    n += 1
+    IF n > 4096 THEN BREAK.
+    p2 = INSTRING('|', s, 1, p1)
+    IF p2
+      item = SUB(s, p1, p2 - p1)
+    ELSE
+      item = SUB(s, p1, SIZE(s) - p1 + 1)
+    END
+    item = UPPER(CLIP(LEFT(item)))
+    IF item = want THEN RETURN n.
+    IF ~hit AND isnum AND NUMERIC(CLIP(item))
+      IF DEFORMAT(CLIP(item)) = DEFORMAT(CLIP(want)) THEN hit = n.
+    END
+    IF ~p2 THEN BREAK.
+    p1 = p2 + 1
+    IF p1 > SIZE(s) THEN BREAK.
+  END
+  RETURN hit
+
+!  FindLookup - is this row an AddFileDrop row?  On a hit the queue
+!  buffer is left FIXed on it, so the caller reads SELF.Lookups.xxx.
+PropGridClass.FindLookup PROCEDURE(SIGNED row)
+i SIGNED
+  CODE
+  IF SELF.Lookups &= NULL OR ~row THEN RETURN 0.
+  LOOP i = 1 TO RECORDS(SELF.Lookups)
+    GET(SELF.Lookups, i)
+    IF ERRORCODE() THEN BREAK.
+    IF SELF.Lookups.Row = row THEN RETURN 1.
+  END
   RETURN 0

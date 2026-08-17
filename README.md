@@ -17,6 +17,11 @@ the Clarion AppGen through the `ClaPropGrid` template chain (ABC):
    values back on OK (or live). The form's own OK/Cancel logic keeps
    working — grid button rows simply POST `EVENT:Accepted` to the original
    buttons. Placement is dockable (fill/left/right) or region-tracked.
+   Its **Lookups** tab folds the classic lookup trio — code `ENTRY` +
+   `'...'` **BUTTON** + description `STRING` — into **one drop-down row
+   that shows the description and writes the code back**, filled from the
+   lookup table at window-open time. Lookups you leave as buttons still
+   work, and the grid now refreshes itself after the browse closes.
 
 ![screenshot](docs/screenshot.png)
 
@@ -89,6 +94,16 @@ Or, for a whole form at once:
 ```clarion
   PG.InitXY(Window, x, y, w, h, PGS:Border)
   PG.BuildFromWindow(0, ?OK & '|' & ?Cancel)   ! converts + hides controls
+```
+
+And a lookup trio as one drop-down row (codes/names are parallel pipe lists,
+built with `PG.PipeSafe()` so a `'|'` in the data cannot split them):
+
+```clarion
+  row = PG.AddFileDrop(cat, '', ?DeptCode, ?DeptName, |
+                       'D01|D02|D03', 'Sales|Support|Warehouse', 'Pick a department')
+  ! shows the DESCRIPTION, writes the CODE into ?DeptCode's USE variable,
+  ! hides the code + description controls, takes its label from the PROMPT.
 ```
 
 ## License / status

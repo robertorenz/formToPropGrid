@@ -341,6 +341,40 @@ PGSave:%PGObject ROUTINE
       #ENDBUTTON
     #ENDBOXED
   #ENDTAB
+  #TAB('&Lookups')
+    #BOXED('Lookup trios as drop-down rows')
+      #DISPLAY('The classic Clarion lookup is three controls: an ENTRY holding')
+      #DISPLAY('the CODE, a "..." BUTTON that opens a select browse, and a')
+      #DISPLAY('STRING showing the DESCRIPTION.  Listed here, the three become')
+      #DISPLAY('ONE drop-down row that shows the description and writes the code')
+      #DISPLAY('back - no browse needed.  All three controls are excluded from')
+      #DISPLAY('the automatic conversion and hidden.')
+      #DISPLAY('')
+      #DISPLAY('The lookup file is read once, when the window opens, so this')
+      #DISPLAY('suits code tables (departments, states, statuses) - not files')
+      #DISPLAY('with thousands of records.  The scan stops at the object''s')
+      #DISPLAY('MaxScanItems (500 by default); leave the browse button alone for')
+      #DISPLAY('anything bigger.')
+      #BUTTON('Lookup &drop-downs...'),MULTI(%F2PLookup,%F2PLookupCode & ' -> ' & %F2PLookupFile & '.' & %F2PLookupDescFld),INLINE
+        #BOXED('The three controls on THIS window')
+          #PROMPT('&Code control (the ENTRY holding the code):',CONTROL),%F2PLookupCode,REQ
+          #PROMPT('Lookup &button (the "..." - hidden, optional):',CONTROL),%F2PLookupBtn
+          #PROMPT('&Description control (hidden, optional):',CONTROL),%F2PLookupDesc
+        #ENDBOXED
+        #BOXED('The lookup file')
+          #PROMPT('&File:',FILE),%F2PLookupFile,REQ
+          #PROMPT('&Order by key (blank = record order):',KEY(%F2PLookupFile)),%F2PLookupKey
+          #PROMPT('Cod&e field (goes into the code control):',FIELD(%F2PLookupFile)),%F2PLookupCodeFld,REQ
+          #PROMPT('Descri&ption field (what the row shows):',FIELD(%F2PLookupFile)),%F2PLookupDescFld,REQ
+        #ENDBOXED
+        #BOXED('Row')
+          #PROMPT('&Label (blank = the prompt in front of the code control):',@s64),%F2PLookupLabel
+          #PROMPT('C&ategory (blank = the default category):',@s64),%F2PLookupCat
+          #PROMPT('Descrip&tion (shown in the description pane):',@s255),%F2PLookupTip
+        #ENDBOXED
+      #ENDBUTTON
+    #ENDBOXED
+  #ENDTAB
   #TAB('&Buttons')
     #BOXED('OK and Cancel')
       #PROMPT('&Handling:',DROP('Keep the buttons visible|Add OK/Cancel rows to the grid and hide the buttons')),%F2PButtons,DEFAULT('Keep the buttons visible')
@@ -371,12 +405,38 @@ PGSave:%PGObject ROUTINE
 #!-----------------------------------------------------------------------------
 #ATSTART
   #DECLARE(%F2PStyleNum)
+  #DECLARE(%F2PLNo)
+  #DECLARE(%F2PLCatNo)
+  #DECLARE(%F2PLCatVar)
+  #DECLARE(%F2PLNameCtl)
   #SET(%F2PStyleNum,%PGStyleNumber())
   #EQUATE(%F2POkCtl,%PGGetOkControl())
   #EQUATE(%F2PCancelCtl,%PGGetCancelControl())
   #IF(%F2PClass = '')
     #SET(%F2PClass,'PropGridClass')
   #ENDIF
+#!  the DISTINCT category overrides used by the lookup rows.  A blank
+#!  override - or one that just repeats the default category - reuses
+#!  PGFCat and gets no entry here.
+  #IF(VAREXISTS(%F2PLCats) = 0)
+    #DECLARE(%F2PLCats),MULTI,UNIQUE
+  #ENDIF
+  #FREE(%F2PLCats)
+  #FOR(%F2PLookup),WHERE(%F2PLookupCat AND UPPER(%F2PLookupCat) <> UPPER(%F2PCategory))
+    #ADD(%F2PLCats,%F2PLookupCat)
+  #ENDFOR
+#ENDAT
+#!
+#! Every lookup file has to be a file this PROCEDURE uses, or the
+#! generated Relate: / Access: references have nothing to bind to.
+#! %GatherSymbols + #ADD(%ProcFilesUsed,...) is exactly how ABC's own
+#! RecordValidation extension pulls in a "must be in file" table
+#! (ABUPDATE.TPW:112).  ABC then opens it at Init PRIORITY(7500) and
+#! closes it in Kill, well before the grid is built at 8600.
+#AT(%GatherSymbols),WHERE(%F2PDisable=0)
+  #FOR(%F2PLookup),WHERE(%F2PLookupFile)
+    #ADD(%ProcFilesUsed,%F2PLookupFile)
+  #ENDFOR
 #ENDAT
 #!
 #AT(%AfterGlobalIncludes),WHERE(%F2PDisable=0)
@@ -404,6 +464,20 @@ PGFAct:%ActiveTemplateInstance   LONG                            ! 'Actions' cat
 PGFOkRow:%ActiveTemplateInstance LONG
 PGFCanRow:%ActiveTemplateInstance LONG
   #ENDIF
+  #IF(ITEMS(%F2PLookup))
+PGFLCnt:%ActiveTemplateInstance  SIGNED                          ! records taken from the lookup file
+PGFLBuf:%ActiveTemplateInstance  USHORT                          ! ABC SaveBuffer handle (the scan is side effect free)
+  #ENDIF
+  #FOR(%F2PLCats)
+    #SET(%F2PLCatNo,INSTANCE(%F2PLCats))
+PGFLCat:%ActiveTemplateInstance:%F2PLCatNo LONG                  ! lookup category '%F2PLCats'
+  #ENDFOR
+  #FOR(%F2PLookup)
+    #SET(%F2PLNo,INSTANCE(%F2PLookup))
+PGFLRow:%ActiveTemplateInstance:%F2PLNo  LONG                    ! drop row for %F2PLookupCode
+PGFLCode:%ActiveTemplateInstance:%F2PLNo STRING(2048)            ! pipe list: %F2PLookupFile.%F2PLookupCodeFld
+PGFLName:%ActiveTemplateInstance:%F2PLNo STRING(4096)            ! pipe list: %F2PLookupFile.%F2PLookupDescFld
+  #ENDFOR
 #ENDAT
 #!
 #AT(%WindowManagerMethodCodeSection,'Init','(),BYTE'),PRIORITY(8600),WHERE(%F2PDisable=0),DESCRIPTION('ClaPropGrid: convert the form into a property grid')
@@ -425,8 +499,74 @@ PGFCanRow:%ActiveTemplateInstance LONG
   #IF(%F2PCancelCtl)
     PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PCancelCtl
   #ENDIF
+  #! every control of every lookup trio - collected BEFORE BuildFromWindow,
+  #! because the exclude list is an argument to it.
+  #FOR(%F2PLookup)
+    #IF(%F2PLookupCode)
+    PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PLookupCode
+    #ENDIF
+    #IF(%F2PLookupBtn)
+    PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PLookupBtn
+    #ENDIF
+    #IF(%F2PLookupDesc)
+    PGFExcl:%ActiveTemplateInstance = CLIP(PGFExcl:%ActiveTemplateInstance) & '|' & %F2PLookupDesc
+    #ENDIF
+  #ENDFOR
     PGFCat:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PCategory')
     %F2PObject.BuildFromWindow(PGFCat:%ActiveTemplateInstance,CLIP(PGFExcl:%ActiveTemplateInstance))
+  #FOR(%F2PLCats)
+    #SET(%F2PLCatNo,INSTANCE(%F2PLCats))
+    PGFLCat:%ActiveTemplateInstance:%F2PLCatNo = %F2PObject.AddCategory('%F2PLCats')
+  #ENDFOR
+  #FOR(%F2PLookup)
+    #SET(%F2PLNo,INSTANCE(%F2PLookup))
+    #! which category variable this row goes into, and which control (if
+    #! any) shows the description.  Plain #SETs - NOT #GROUP/%() calls,
+    #! which come back empty from inside this loop.
+    #SET(%F2PLCatVar,'PGFCat:' & %ActiveTemplateInstance)
+    #SET(%F2PLCatNo,0)
+    #IF(%F2PLookupCat)
+      #SET(%F2PLCatNo,INLIST(%F2PLookupCat,%F2PLCats))
+    #ENDIF
+    #IF(%F2PLCatNo)
+      #SET(%F2PLCatVar,'PGFLCat:' & %ActiveTemplateInstance & ':' & %F2PLCatNo)
+    #ENDIF
+    #SET(%F2PLNameCtl,'0')
+    #IF(%F2PLookupDesc)
+      #SET(%F2PLNameCtl,%F2PLookupDesc)
+    #ENDIF
+!   lookup %F2PLNo: %F2PLookupCode + %F2PLookupBtn -> one drop row from %F2PLookupFile
+    PGFLCode:%ActiveTemplateInstance:%F2PLNo = ''
+    PGFLName:%ActiveTemplateInstance:%F2PLNo = ''
+    PGFLCnt:%ActiveTemplateInstance = 0
+    Relate:%F2PLookupFile.Open()                                  ! reference counted - safe
+    PGFLBuf:%ActiveTemplateInstance = Access:%F2PLookupFile.SaveBuffer()
+    #IF(%F2PLookupKey)
+    SET(%F2PLookupKey)
+    #ELSE
+    SET(%F2PLookupFile)
+    #ENDIF
+    LOOP
+      IF Access:%F2PLookupFile.Next() THEN BREAK.
+      IF PGFLCnt:%ActiveTemplateInstance >= %F2PObject.MaxScanItems THEN BREAK.
+      IF LEN(CLIP(PGFLCode:%ActiveTemplateInstance:%F2PLNo)) > 1900 THEN BREAK.
+      IF LEN(CLIP(PGFLName:%ActiveTemplateInstance:%F2PLNo)) > 3900 THEN BREAK.
+      PGFLCnt:%ActiveTemplateInstance += 1
+      IF PGFLCnt:%ActiveTemplateInstance = 1
+        PGFLCode:%ActiveTemplateInstance:%F2PLNo = %F2PObject.PipeSafe(%F2PLookupCodeFld)
+        PGFLName:%ActiveTemplateInstance:%F2PLNo = %F2PObject.PipeSafe(%F2PLookupDescFld)
+      ELSE
+        PGFLCode:%ActiveTemplateInstance:%F2PLNo = CLIP(PGFLCode:%ActiveTemplateInstance:%F2PLNo) & '|' & %F2PObject.PipeSafe(%F2PLookupCodeFld)
+        PGFLName:%ActiveTemplateInstance:%F2PLNo = CLIP(PGFLName:%ActiveTemplateInstance:%F2PLNo) & '|' & %F2PObject.PipeSafe(%F2PLookupDescFld)
+      END
+    END
+    Access:%F2PLookupFile.RestoreBuffer(PGFLBuf:%ActiveTemplateInstance)
+    Relate:%F2PLookupFile.Close()
+    PGFLRow:%ActiveTemplateInstance:%F2PLNo = %F2PObject.AddFileDrop(%F2PLCatVar,'%F2PLookupLabel',%F2PLookupCode,%F2PLNameCtl,CLIP(PGFLCode:%ActiveTemplateInstance:%F2PLNo),CLIP(PGFLName:%ActiveTemplateInstance:%F2PLNo),'%F2PLookupTip')
+    #IF(%F2PLookupBtn)
+    HIDE(%F2PLookupBtn)                                           ! the drop row replaces the browse
+    #ENDIF
+  #ENDFOR
   #IF(%F2PButtons = 'Add OK/Cancel rows to the grid and hide the buttons')
     PGFAct:%ActiveTemplateInstance = %F2PObject.AddCategory('%F2PActionCat')
     #IF(%F2POkCtl)

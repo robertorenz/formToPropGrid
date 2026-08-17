@@ -79,6 +79,19 @@ PGD:Left        EQUATE(2)   ! dock to the left edge, DockSize wide
 PGD:Right       EQUATE(3)   ! dock to the right edge, DockSize wide
 PGD:Fixed       EQUATE(4)   ! do not move on resize
 
+!---- lookup registry (see PropGridClass.AddFileDrop) -----------------
+! One entry per "lookup trio" (code ENTRY + '...' BUTTON + description
+! STRING) that has been folded into a single PGT:Drop row.  Codes and
+! Names are PARALLEL pipe-delimited lists: item n of Names is what the
+! grid shows, item n of Codes is what gets written back to CodeFeq.
+PropGridLookupQueue QUEUE,TYPE
+Row                   SIGNED                  ! grid row id (also the SetTag row)
+CodeFeq               SIGNED                  ! control holding the code   (hidden)
+NameFeq               SIGNED                  ! control showing the name   (hidden, 0 = none)
+Codes                 STRING(2048)            ! 'A|B|C'   - written back
+Names                 STRING(4096)            ! 'Ape|Bee|Cat' - displayed
+                    END
+
 PropGridClass CLASS,TYPE,MODULE('PropGrid.clw'),LINK('PropGrid.clw',_PropGridLinkMode_),DLL(_PropGridDllMode_)
 PG              LONG                          ! HPG handle (0 = dead)
 Win             &WINDOW                       ! owning Clarion window
@@ -94,6 +107,8 @@ Initialized     BYTE
 TimerInterval   SIGNED                        ! forced on the window (0 = leave alone)
 MaxScanItems    SIGNED                        ! cap when enumerating a queue DROP
 NextPrompt      SIGNED                        ! label feq feeding the next AddControl
+PendingSyncFrom BYTE                          ! >0 = SyncFrom() in N more TakeEvent calls
+Lookups         &PropGridLookupQueue,PRIVATE  ! AddFileDrop registry (NEW in Construct)
 Construct       PROCEDURE()
 Destruct        PROCEDURE()
 !-- lifetime --
@@ -128,6 +143,9 @@ RowCount        PROCEDURE(),SIGNED
 !-- form conversion (runtime reflection) --
 AddControl      PROCEDURE(SIGNED feq, SIGNED category=0),SIGNED,PROC,VIRTUAL
 BuildFromWindow PROCEDURE(SIGNED category=0, <STRING excludeFeqs>),SIGNED,PROC,VIRTUAL
+AddFileDrop     PROCEDURE(SIGNED category, STRING label, SIGNED codeFeq, SIGNED nameFeq, |
+                          STRING codes, STRING names, <STRING description>),SIGNED,PROC,VIRTUAL
+PipeSafe        PROCEDURE(STRING txt),STRING  ! CLIP+LEFT, and '|' in data -> '/'
 SyncBack        PROCEDURE()                   ! all grid values -> USE vars
 SyncRow         PROCEDURE(SIGNED row)         ! one grid value  -> USE var
 SyncFrom        PROCEDURE()                   ! USE vars -> grid values
@@ -145,6 +163,14 @@ ChildLabelAt    PROCEDURE(SIGNED optFeq, SIGNED ordinal),STRING,PRIVATE
 ChildOrdinal    PROCEDURE(SIGNED optFeq, STRING label),SIGNED,PRIVATE
 ListChoices     PROCEDURE(SIGNED feq),STRING,PRIVATE
 ListSelect      PROCEDURE(SIGNED feq, STRING val),BYTE,PROC,PRIVATE
+WriteControl    PROCEDURE(SIGNED feq, STRING val),PRIVATE
+PrevLabelFeq    PROCEDURE(SIGNED feq, SIGNED skipFeq),SIGNED,PRIVATE
+SetNameControl  PROCEDURE(SIGNED feq, STRING txt),PRIVATE
+!-- pipe-delimited list helpers (used by the lookup rows and by ListChoices) --
+PipeAppend      PROCEDURE(*STRING list, STRING value, SIGNED itemNo),PRIVATE
+PipeItem        PROCEDURE(STRING list, SIGNED ordinal),STRING,PRIVATE
+PipeFind        PROCEDURE(STRING list, STRING value),SIGNED,PRIVATE
+FindLookup      PROCEDURE(SIGNED row),BYTE,PRIVATE  ! fixes SELF.Lookups on a hit
               END
 
   _EndOfInclude_
