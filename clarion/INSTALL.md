@@ -3,6 +3,12 @@
 A Direct2D property grid for Clarion. `PROPGRID.DLL` renders the grid, `PropGridClass`
 wraps it, and the `ClaPropGrid` template set wires it into an ABC application.
 
+> **New in v1.2** — fonts can now be set **per category and per row**, not just for the whole
+> grid; rows **size themselves** to whatever font they carry; and a value can **wrap over
+> several lines**, growing its row and pushing the rest of the grid down. See
+> [§5e](#5e-fonts-per-category-per-row-and-wrapped-values). Nothing about v1.1 changed:
+> an app that never touches the new prompts generates and behaves exactly as before.
+
 ## What is in this folder
 
 | File | Role | Goes to |
@@ -12,6 +18,8 @@ wraps it, and the `ClaPropGrid` template set wires it into an ABC application.
 | `ClaPropGrid.tpl` | template chain root (3 templates) | `C:\clarion12\accessory\template\win` |
 | `ClaPropGrid.tpw` | shared `#GROUP`s the `.tpl` includes | same folder as the `.tpl` |
 | `..\src\propgrid.h` | the DLL's flat C API — reference only, nothing to install | — |
+| `..\docs\ClaPropGrid-classes.html` | the class guide (EN/ES) — every property and method, with source line references | — |
+| `..\examples\PropGridDemo` | a hand-coded Clarion app that exercises the whole class; `build.bat`, then `PropGridDemo.exe 1\|2\|3` | — |
 
 Everything must be saved **ANSI** (no UTF-8 BOM) with **CRLF** line endings. A BOM breaks
 both the Clarion compiler and the template parser.
@@ -32,12 +40,20 @@ both the Clarion compiler and the template parser.
 
 **`propgrid.lib` ships pre-built in this folder — no LibMaker step, ever.**
 `src\build.bat` generates it directly from `propgrid.def`
-(`src\make-clarion-lib.ps1`): 29 OMF import records, by ordinal, in the same
-byte layout as Clarion's own `ClaTPS.lib`. Because it contains import records
-only — no compiled code — **the one file works unchanged in Clarion 9, 9.1,
-10, 11, 11.1 and 12**, and only ever changes if the DLL API itself grows.
+(`src\make-clarion-lib.ps1`): 42 OMF import records as of v1.2, by ordinal, in
+the same byte layout as Clarion's own `ClaTPS.lib`. Because it contains import
+records only — no compiled code — **the one file works unchanged in Clarion 9,
+9.1, 10, 11, 11.1 and 12**, and only ever changes when the DLL API grows (v1.1
+had 29; v1.2 appended the font and wrapping calls at 30–42).
 (The export ordinals are pinned as a contract in `propgrid.def`; they are
-never renumbered.)
+never renumbered, so a newer DLL always satisfies an older lib.)
+
+> **Ship the pair.** Because the lib binds by ordinal, a *new* lib against an
+> *old* DLL fails at load with `Entry Point Not Found` naming the first export
+> the DLL lacks. `propgrid.lib` and `propgrid.dll` are built together by
+> `src\build.bat` — deploy them together too, `accessory\lib` and
+> `accessory\bin` in the same pass. The reverse (old lib, new DLL) is always
+> fine.
 
 Put `propgrid.lib` where the linker will find it — the simplest choice is the
 application folder; the tidiest is `C:\clarion12\accessory\lib`.
@@ -123,13 +139,15 @@ grid is created over that region and re-tracks it on every resize. It is `MULTI`
 window may carry several independent grids.
 
 Prompts: *General* (object name, live sync, timer), *Appearance* (style bits, three fonts,
-row height, splitter), *Colours* (eleven slots), *Fields* (a repeating **Properties…** list).
+row height, splitter, **per-category fonts**), *Colours* (eleven slots), *Fields* (a repeating
+**Properties…** list).
 
 Each field entry takes a **variable or dictionary column** (the `FIELD` prompt has the
 dictionary lookup button but accepts any Clarion variable that is in scope — `LOC:Whatever`,
 a global, a queue field), a display name, a **category** (entries sharing a category name are
 merged under one header), an editor type, choices, a range, a picture, read-only and a
-description.
+description — plus a *This row on its own* box (**wrap** count and a name/value **font
+override**) for the odd row that has to stand out.
 
 Generated code (per instance `n`, object name `Obj`):
 
@@ -142,8 +160,10 @@ PGRow:n:1            LONG            ! one per field entry
 * `ThisWindow.Init`, **PRIORITY 8600** — after ABC opens the window (8000), restores its INI
   size (8250) and runs the field templates (8500), so the REGION is at its final size:
   `Obj.Init(window, ?region, style)`, the fonts/colours/metrics, `AddCategory` per category,
-  `AddProperty` (+ `SetChoices` / `SetRange` / `SetDescription` / `SetReadOnly`) per row, then
-  `DO PGLoad:Obj`.
+  `AddProperty` (+ `SetChoices` / `SetRange` / `SetDescription` / `SetReadOnly` /
+  `SetRowWrap` / `SetRowFontFace`) per row, then the per-category fonts
+  (`SetCategoryFontFace(FindCategory('name'), …)` — emitted **after** the loop, once every
+  header exists), then `DO PGLoad:Obj`.
 * `ThisWindow.TakeWindowEvent`, **PRIORITY 2000** — a self-contained `CASE EVENT()`:
   `EVENT:Timer` pumps `Obj.TakeEvent()` (and `DO PGSave:Obj` when Live sync is on);
   `EVENT:Sized` **posts** `PGResize:Obj`, and the posted event calls `Obj.Reposition()`
@@ -178,6 +198,12 @@ unchanged.
 
 On the OK button's `EVENT:Accepted` (embedded early, PRIORITY 2000, ahead of the generated
 form logic at 4999) the template emits `Obj.SyncBack()` unless Live sync is on.
+
+Styling: the *Appearance* and *Colours* tabs are the same ones the control template has,
+including the **Category fonts** list. Since converted controls have no design-time entry of
+their own, per-category is how you give part of a converted form a different font — see
+[§5e](#5e-fonts-per-category-per-row-and-wrapped-values). With the *Tabs* tab on, each TAB's
+text is a category, so "everything that was on the Address tab in 8pt" is one entry.
 
 #### Multi-tab windows → categories (the *Tabs* tab)
 
@@ -309,6 +335,7 @@ scan cannot convert) — the same list the `PropertyGridControl` template offers
 | *Editor* | `Text` (Text\|Password\|Drop list\|Checkbox\|Radio\|Slider\|Spin\|Button\|Color\|Date\|Time\|Multiline\|Read only) |
 | *Choices* (Drop/Radio), *Range low/high/step* (Slider/Spin), *Picture* (Date/Time) | `@d17` / `@t4` when blank |
 | *Read only*, *Description* | 0 / blank |
+| *This row on its own*: wrap count, name/value face + size + bold | 0 / blank — see [§5e](#5e-fonts-per-category-per-row-and-wrapped-values) |
 
 These rows are bound to a **variable**, not to a control, so they carry no field equate and
 `SyncBack()` / `SyncFrom()` step over them (`GetTag` = 0). They are moved by two generated
@@ -357,6 +384,71 @@ drop-down `LIST`/`COMBO`, `TEXT`, `BUTTON`, `STRING`/`PROMPT` (read-only rows wh
 explicitly). It deliberately skips a **plain browse LIST** (no `DROP` attribute), plus
 SHEET/TAB/GROUP/PANEL/IMAGE/LINE/BOX/ELLIPSE/REGION/MENU/ITEM/TOOLBAR/PROGRESS/OLE/CUSTOM.
 
+### 5e. Fonts per category, per row, and wrapped values
+
+New in v1.2. The four font slots on *Appearance* still style the whole grid, and that is what
+almost every window wants — everything here is for the exception.
+
+#### Per-category fonts (*Appearance* → **Category fonts…**)
+
+One entry per override: the **category name**, what it *applies to* (value column, name column
+or the category header), a face, a size, bold and italic. A blank face or a size of 0 inherits
+that part.
+
+Categories are matched **by name at generate time into a run-time lookup** —
+`obj.SetCategoryFontFace(obj.FindCategory('Sales'), PGF:Value, 'Consolas', 10, 0, 0)` — so one
+entry reaches a category however it was created: by the *Fields* list, by a lookup, by an
+added row, by the actions block, or by a **TAB** whose text became the category. `FindCategory`
+returns 0 for a name that matches nothing and `SetCategoryFontFace` ignores a category of 0, so
+a typo is a silent no-op rather than an empty header.
+
+The calls are emitted **last**, after everything that can create a header. That ordering is the
+whole reason it works for tab categories, which do not exist until `BuildFromWindow` has run.
+
+#### Per-row overrides (*Fields* / *Added rows* → **This row on its own**)
+
+| Prompt | Emits | Effect |
+|---|---|---|
+| *Wrap the value over up to N lines* | `SetRowWrap(row, N)` | 0 = one line + ellipsis (the default). N = wrap over at most N lines. The row grows to fit and the rows below move down |
+| *Name / Value face, size, bold* | `SetRowFontFace(row, PGF:Name\|PGF:Value, …)` | that row only, overriding its category |
+
+Only rows the template *knows about* have these prompts — the designed **Fields** list and the
+**Added rows** list. Controls discovered by `BuildFromWindow` have no design-time entry, so
+style those **per category** instead (or call `SetRowFontFace` in the *after the grid is built*
+embed, using `FindRow('Label')` to get the row).
+
+#### What this changes at run time
+
+Row height is no longer uniform. Each row is measured from the fonts it actually carries, and a
+wrapped row from a real DirectWrite layout of its text, so:
+
+* a row with a bigger font is simply taller — nothing else moves or clips;
+* a wrapped row re-flows when the **window is resized or the splitter dragged**, because its
+  height is a function of the value cell's width;
+* `SetRowHeight` (Appearance → *Row height in pixels*) still wins outright. Pin a height and
+  every row is that height again, wrapped text clipped to it — the escape hatch back to the
+  v1.1 look.
+
+#### From code
+
+```clarion
+fMono = Grid.AddFont('Consolas', 10, 0, 0)     ! de-duplicated: safe in a loop
+Grid.SetCategoryFont(cNumbers, PGF:Inherit, PGF:Inherit, fMono)
+Grid.SetCategoryFontFace(cNotes, PGF:Category, 'Segoe UI', 12, 1, 0)
+Grid.SetRowFontFace(rName, PGF:Value, 'Georgia', 14, 1, 1)
+Grid.SetRowWrap(rNote, -1)                     ! -1 = as many lines as it takes
+Grid.SetRowWrap(rTerms, 3)                     ! 3 lines, then clip
+
+Grid.GetRowFont(rName, NameF, ValF)            ! read any of it back
+Grid.GetFontInfo(ValF, Face, Pt, Bold, Ital)   ! -> Georgia 14 1 1
+h = Grid.RowHeight(rNote)                      ! the measured height, px
+```
+
+Font ids resolve **row → category → global slot**; `PGF:Inherit` (0) anywhere means "fall
+through". `AddFont` returns the *same* id for an identical face/size/bold/italic, so calling it
+per row costs nothing. The full method list is in `..\docs\ClaPropGrid-classes.html`, and
+`..\examples\PropGridDemo` window 1 exercises every one of them.
+
 ---
 
 ## 6. Verified runtime notes (why the class does what it does)
@@ -380,6 +472,9 @@ contradict the obvious reading of the docs. Change the class at your peril.
 | `FileManager.Opened` is a counter (`ABFILE.CLW:899`) | the generated `Relate:x.Open()/Close()` pair around a lookup scan cannot close a file ABC still needs |
 | A designer "drop list" is a `LIST` with `DROP()`; `PROP:Type` is `CREATE:list` (14), not `CREATE:droplist` | `PROP:Drop` is what distinguishes a drop-down from a browse list |
 | Every property read/write above still works after `feq{PROP:Hide} = TRUE` | hiding the originals does not break SyncBack |
+| A shared `IDWriteTextFormat` is single-line, vertically centred and ellipsis-trimmed | a wrapped cell cannot reuse it — `DrawTextWrapC` builds its own `IDWriteTextLayout` per paint with wrapping on and top alignment, and measures with `GetLineMetrics` so what is drawn is what was measured |
+| Row geometry used to be `index * rowHeight` in fifteen places (scroll, hit test, paint window, editor rects, PgUp/PgDn, wheel) | v1.2 measures every line once in `RebuildVis` into `VisItem.h` / `.y` and everything reads that table; the only integer division left is the *nominal* line used for a wheel notch and a page |
+| A wrapped row's height depends on the value cell's **width** | resizing the window or dragging the splitter must re-measure, not just repaint — `Grid.anyWrap` gates that so a grid with no wrapped rows pays nothing |
 
 Also, in `PropGrid.clw` the DLL prototypes live in `MODULE('ClaPropGridDLL')` and **not**
 `MODULE('PROPGRID.DLL')`: Clarion strips the extension, matches the result against the module
@@ -402,6 +497,53 @@ ClarionCL -win -au -ag app.app                               :: GENERATE, then r
 C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe myapp.cwproj ^
     -p:Configuration=Release -p:ClarionBinPath=C:\clarion12\bin
 ```
+
+### A hand-coded project, for testing the class without an .app
+
+The fastest way to prove a class change is a plain Clarion PROGRAM — no AppGen, no dictionary.
+`..\examples\PropGridDemo` is exactly that; the two things that are not obvious:
+
+```clarion
+  PROGRAM
+  PRAGMA('link(propgrid.lib)')      !  <-- this is how the import lib gets linked
+  INCLUDE('PropGrid.inc'),ONCE
+```
+
+* **`PRAGMA('link(propgrid.lib)')` in the source is what links the import library.** A
+  `<LibraryFile Include="propgrid.lib"/>` item in the `.cwproj` does nothing at all — you get
+  `Unresolved External PG_Create` and a page of friends.
+* **Never list `PropGrid.clw` in the project.** The class declaration carries
+  `LINK('PropGrid.clw', _PropGridLinkMode_)`, so Clarion pulls the module in itself; listing it
+  as well gets you `_main` unresolved.
+
+A minimal project file:
+
+```xml
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration>Release</Configuration><Platform>Win32</Platform>
+    <OutputType>WinExe</OutputType>
+    <OutputName>pgtest</OutputName>
+    <Model>Local</Model><stack_size>16384</stack_size>
+  </PropertyGroup>
+  <ItemGroup><Compile Include="pgtest.clw" /></ItemGroup>
+  <Import Project="$(ClarionBinPath)\SoftVelocity.Build.Clarion.targets" />
+</Project>
+```
+
+```
+C:\Windows\Microsoft.NET\Framework\v4.0.30319\MSBuild.exe pgtest.cwproj ^
+    /p:ClarionBinPath=C:\clarion12\bin
+```
+
+A harness that ends in `HALT(0)` on success and `HALT(n)` per failed check reports its result
+as the process exit code, which is enough to verify a whole API from a script.
+
+> **The Clarion build copies DLLs off the redirection path into the output folder.** If
+> `accessory\bin\propgrid.dll` is older than the one you just built, it is silently dropped on
+> top of your fresh copy and the EXE dies with *"Entry Point Not Found"* on the newest export.
+> Stage `propgrid.dll` **after** the link (that is what `examples\PropGridDemo\build.bat` does),
+> or keep `accessory\bin` up to date.
 
 TXA gotcha worth writing down: a repeating `#BUTTON(...),MULTI(%list,%desc)` list is stored as
 `%list MULTI LONG  (1, 2)` — the **list of row keys** — with its children as
@@ -452,7 +594,12 @@ the Added-rows code does for the row label. **If generated code disappears entir
 | `Could not open include file ClaPropGrid.tpw` when registering | the `.tpw` is not in the same folder as the `.tpl` being registered |
 | The new prompts do not appear | the IDE was open during `-tr`; restart it |
 | A prompt-time action (e.g. *Scan this window for lookups*) behaves like the **previous** build — right prompts, old behaviour | same cause, and the one that bites hardest: the registry holds a *parsed* copy of the chain, and an IDE that was already open keeps serving it. Close the IDE, re-run `-tr`, reopen. Deploying the new `.tpl` alone changes nothing |
-| `Unresolved External PG_Create` | `propgrid.lib` missing from the project / linker path, or built with decorated names |
+| `Unresolved External PG_Create` | `propgrid.lib` missing from the project / linker path, or built with decorated names. In a **hand-coded** project the lib is linked by `PRAGMA('link(propgrid.lib)')` in the source — a `<LibraryFile>` project item does nothing |
+| `Entry Point Not Found: the procedure entry point PG_AddFont could not be located` | a **stale `propgrid.dll`** is being loaded. The import lib binds by ordinal, so a DLL older than the lib is missing the newest exports. Usually `accessory\bin\propgrid.dll` — which the Clarion build copies into the output folder over the top of a freshly staged one |
+| `Unresolved External _main in iexe32.obj` | `PropGrid.clw` was listed in the project. Its `LINK()` attribute already pulls it in; remove it from the file list |
+| A per-category font does nothing | the category name does not match. `FindCategory` is case-insensitive but exact otherwise, and returns 0 for a name that matches nothing — deliberately, so a typo cannot leave an empty header. Check it against the name in the *Fields* list / the TAB's own text |
+| A wrapped row is still one line | *Row height in pixels* is set on the *Appearance* tab. A pinned height wins over wrapping and every row stays uniform — set it back to 0 |
+| Wrapped rows do not re-flow when the window is resized | they do, on `EVENT:Sized` — but only for rows whose *Wrap* count is above 0. A row with wrap 0 is one line by design |
 | `Missing procedure definition: PG_CREATE(...)` | the `MODULE()` label in `PropGrid.clw` was changed back to `PROPGRID.DLL` |
 | `Label duplicated, second used: _PROPGRIDLINKMODE_` | the two mode defines were EQUATEd inside `PropGrid.inc`; they must arrive only as project defines |
 | The grid is created but stays blank | the window has no timer — set the template's *Timer interval* above 0, or give the window `TIMER()` |

@@ -142,15 +142,15 @@
       <tr><th>File</th><th>What it is</th></tr>
       <tr><td><code>PropGrid.inc</code></td><td>The <code>CLASS</code> declaration, the
         <code>PGT:</code> / <code>PGE:</code> / <code>PGS:</code> / <code>PGF:</code> / <code>PGC:</code> /
-        <code>PGD:</code> equates, and the three <code>QUEUE,TYPE</code> registries. 208 lines.</td></tr>
+        <code>PGD:</code> equates, and the three <code>QUEUE,TYPE</code> registries. 237 lines.</td></tr>
       <tr><td><code>PropGrid.clw</code></td><td>The implementation — <code>MEMBER</code> with a module
-        <code>MAP</code> of the flat C API. 1263 lines.</td></tr>
+        <code>MAP</code> of the flat C API. 1370 lines.</td></tr>
       <tr><td><code>propgrid.dll</code></td><td>The Direct2D engine. Flat C API, <code>__stdcall</code>,
         undecorated names, ANSI strings — exactly what Clarion's <code>PASCAL, RAW, NAME()</code>
         prototypes expect.</td></tr>
       <tr><td><code>ClaPropGrid.tpl</code> / <code>.tpw</code></td><td>The AppGen wrapper: one application
         extension, one <code>MULTI</code> control template and one procedure extension. They write exactly
-        the calls documented here. 1479 + 219 lines.</td></tr>
+        the calls documented here. 1529 + 267 lines.</td></tr>
     </table>
     <div class="callout note"><b>Everything on this page is code you can write yourself.</b> The templates
       are a convenience — they declare the object in <code>%DataSection</code> and emit the same calls at
@@ -170,15 +170,15 @@
       <tr><th>Archivo</th><th>Qué es</th></tr>
       <tr><td><code>PropGrid.inc</code></td><td>La declaración <code>CLASS</code>, los equates
         <code>PGT:</code> / <code>PGE:</code> / <code>PGS:</code> / <code>PGF:</code> / <code>PGC:</code> /
-        <code>PGD:</code>, y las tres <code>QUEUE,TYPE</code> de registro. 208 líneas.</td></tr>
+        <code>PGD:</code>, y las tres <code>QUEUE,TYPE</code> de registro. 237 líneas.</td></tr>
       <tr><td><code>PropGrid.clw</code></td><td>La implementación — <code>MEMBER</code> con un
-        <code>MAP</code> de módulo con la API C plana. 1263 líneas.</td></tr>
+        <code>MAP</code> de módulo con la API C plana. 1370 líneas.</td></tr>
       <tr><td><code>propgrid.dll</code></td><td>El motor Direct2D. API C plana, <code>__stdcall</code>,
         nombres sin decorar, cadenas ANSI — exactamente lo que esperan los prototipos
         <code>PASCAL, RAW, NAME()</code> de Clarion.</td></tr>
       <tr><td><code>ClaPropGrid.tpl</code> / <code>.tpw</code></td><td>El envoltorio de AppGen: una
         extensión de aplicación, una plantilla de control <code>MULTI</code> y una extensión de
-        procedimiento. Escriben exactamente las llamadas que se documentan aquí. 1479 + 219 líneas.</td></tr>
+        procedimiento. Escriben exactamente las llamadas que se documentan aquí. 1529 + 267 líneas.</td></tr>
     </table>
     <div class="callout note"><b>Todo lo de esta página es código que usted puede escribir.</b> Las
       plantillas son una comodidad — declaran el objeto en <code>%DataSection</code> y emiten las mismas
@@ -347,6 +347,8 @@
       <tr><td>3</td><td><code>SetFont</code>, <code>SetColor</code>, <code>SetRowHeight</code>,
         <code>SetSplitter</code></td><td>Any time after <code>Init</code>, but doing it now avoids a
         visible repaint.</td></tr>
+      <tr><td>3a</td><td><code>AddFont</code></td><td>Any time after <code>Init</code>. Registering fonts
+        up front means the ids are ready when the rows are built.</td></tr>
       <tr><td>4</td><td><code>SetTabCategory</code></td><td><b>Before</b> <code>BuildFromWindow</code>. It
         only records the override; once a row has created the tab's header from the tab's own text it is
         too late.</td></tr>
@@ -358,6 +360,9 @@
         trio's three controls were excluded from it.</td></tr>
       <tr><td>8</td><td><code>AddProperty</code> for rows that have no control</td><td>Anywhere after
         <code>Init</code>; these carry no tag and are yours to load and save.</td></tr>
+      <tr><td>8a</td><td><code>SetRowWrap</code>, <code>SetRowFont</code>,
+        <code>SetCategoryFont</code></td><td>After the row or category they name exists. Category fonts in
+        particular have to wait for everything that can create a header, tab categories included.</td></tr>
       <tr><td>9</td><td><code>TrimTabs</code></td><td><b>Last.</b> A tab that is nothing but lookups only
         empties once the trios are folded and hidden.</td></tr>
       <tr><td>10</td><td><code>Redraw</code></td><td>One repaint for the whole batch.</td></tr>
@@ -387,6 +392,8 @@
       <tr><td>3</td><td><code>SetFont</code>, <code>SetColor</code>, <code>SetRowHeight</code>,
         <code>SetSplitter</code></td><td>En cualquier momento tras <code>Init</code>, pero hacerlo ahora
         evita un repintado visible.</td></tr>
+      <tr><td>3a</td><td><code>AddFont</code></td><td>En cualquier momento tras <code>Init</code>.
+        Registrar las fuentes al principio deja los ids listos cuando se construyen las filas.</td></tr>
       <tr><td>4</td><td><code>SetTabCategory</code></td><td><b>Antes</b> de
         <code>BuildFromWindow</code>. Sólo anota el nombre alternativo; cuando una fila ya creó el
         encabezado con el texto de la pestaña, es tarde.</td></tr>
@@ -398,6 +405,10 @@
         tres controles del trío quedaron excluidos de ella.</td></tr>
       <tr><td>8</td><td><code>AddProperty</code> para filas sin control</td><td>En cualquier momento tras
         <code>Init</code>; no llevan tag y usted las carga y las guarda.</td></tr>
+      <tr><td>8a</td><td><code>SetRowWrap</code>, <code>SetRowFont</code>,
+        <code>SetCategoryFont</code></td><td>Después de que exista la fila o la categoría que nombran. Las
+        fuentes de categoría en particular deben esperar a todo lo que pueda crear un encabezado, incluidas
+        las categorías de pestaña.</td></tr>
       <tr><td>9</td><td><code>TrimTabs</code></td><td><b>Al final.</b> Una pestaña que sólo tiene búsquedas
         se vacía únicamente cuando los tríos ya están plegados y ocultos.</td></tr>
       <tr><td>10</td><td><code>Redraw</code></td><td>Un solo repintado para todo el lote.</td></tr>
@@ -728,6 +739,10 @@ PropGridClass.AddCategory <span class="k">PROCEDURE</span>(<span class="k">STRIN
       <tr><td><code>Destruct</code> <span class="src">clw:103</span></td><td>FREE + DISPOSE</td><td>FREE +
         DISPOSE</td><td>FREE + DISPOSE</td></tr>
     </table>
+    <p>The <b>font table</b> is a fourth store and behaves differently on purpose: it survives both
+    <code>Kill</code> and <code>ClearAll</code>, and only <code>Destruct</code> frees it. Font ids you were
+    handed therefore stay valid across a rebuild — clearing the rows does not invalidate the fonts they
+    were using.</p>
     <div class="callout note"><b>Rebuilding rows?</b> Use <code>ClearAll</code>, not <code>Kill</code>.
       <code>Kill</code> destroys the grid itself and leaves the lookup registry pointing at rows that no
       longer exist; <code>ClearAll</code> drops the rows and the registries that describe them while the
@@ -778,6 +793,10 @@ PropGridClass.AddCategory <span class="k">PROCEDURE</span>(<span class="k">STRIN
       <tr><td><code>Destruct</code> <span class="src">clw:103</span></td><td>FREE + DISPOSE</td><td>FREE +
         DISPOSE</td><td>FREE + DISPOSE</td></tr>
     </table>
+    <p>La <b>tabla de fuentes</b> es un cuarto almacén y se comporta distinto a propósito: sobrevive tanto
+    a <code>Kill</code> como a <code>ClearAll</code>, y sólo <code>Destruct</code> la libera. Los ids de
+    fuente que le entregaron siguen siendo válidos tras una reconstrucción — limpiar las filas no invalida
+    las fuentes que usaban.</p>
     <div class="callout note"><b>¿Va a reconstruir las filas?</b> Use <code>ClearAll</code>, no
       <code>Kill</code>. <code>Kill</code> destruye la rejilla y deja el registro de búsquedas apuntando a
       filas que ya no existen; <code>ClearAll</code> quita las filas y los registros que las describen
@@ -2491,6 +2510,11 @@ MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span
       <tr><td><code>%F2PExclude</code></td><td>More FEQs in <code>PGFExcl:<i>inst</i></code>.</td></tr>
       <tr><td><code>%F2PLCats</code></td><td><code>PGFLCat:<i>inst</i>:<i>k</i></code> for categories that
         are neither the default nor Actions.</td></tr>
+      <tr><td><code>%PGCatFont</code></td><td>One
+        <code>SetCategoryFontFace(FindCategory('<i>name</i>'), …)</code> per entry, emitted <b>after</b>
+        every header exists. Shared by both templates, so it also reaches tab categories.</td></tr>
+      <tr><td>per-row prompts on <code>%PGField</code> / <code>%F2PAdded</code></td><td><code>SetRowWrap</code>
+        and <code>SetRowFontFace</code> for that row, inside the same loop that creates it.</td></tr>
     </table>
     <h3>Generated ROUTINEs</h3>
     <p>They live in the procedure, so <code>ThisWindow</code>'s methods can <code>DO</code> them — exactly
@@ -2560,6 +2584,12 @@ MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span
       <tr><td><code>%F2PExclude</code></td><td>Más FEQs en <code>PGFExcl:<i>inst</i></code>.</td></tr>
       <tr><td><code>%F2PLCats</code></td><td><code>PGFLCat:<i>inst</i>:<i>k</i></code> para las categorías
         que no son ni la de por defecto ni la de acciones.</td></tr>
+      <tr><td><code>%PGCatFont</code></td><td>Un
+        <code>SetCategoryFontFace(FindCategory('<i>nombre</i>'), …)</code> por entrada, emitido
+        <b>después</b> de que existan todos los encabezados. Compartida por ambas plantillas, así que
+        también alcanza las categorías de pestaña.</td></tr>
+      <tr><td>prompts por fila en <code>%PGField</code> / <code>%F2PAdded</code></td><td><code>SetRowWrap</code>
+        y <code>SetRowFontFace</code> de esa fila, dentro del mismo bucle que la crea.</td></tr>
     </table>
     <h3>ROUTINEs generadas</h3>
     <p>Viven en el procedimiento, así que los métodos de <code>ThisWindow</code> pueden hacerles

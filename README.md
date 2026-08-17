@@ -79,6 +79,16 @@ push the rest of the grid down.
 - Events delivered through a poll queue (`PG_PollEvent`, pumped from a
   Clarion TIMER) and/or an immediate C callback.
 
+## Getting it
+
+```
+git clone https://github.com/robertorenz/formToPropGrid.git
+```
+
+`bin\propgrid.dll` and `clarion\propgrid.lib` are committed pre-built, so you can install and
+use the templates without a C++ compiler — see `clarion\INSTALL.md`. Rebuild the engine only if
+you change `src\`.
+
 ## Developer reference
 
 `docs/ClaPropGrid-classes.html` — the class guide, bilingual EN/ES, in the
