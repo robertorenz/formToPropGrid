@@ -1138,6 +1138,10 @@ static void KeyNav(Grid* g, int dir)
 /*------------------------------------------------------------------*/
 static LRESULT CALLBACK GridProc(HWND h, UINT m, WPARAM w, LPARAM l)
 {
+#ifdef PG_DEBUG
+    static LONG s_msgCount = 0;
+    if (s_msgCount < 400) { InterlockedIncrement(&s_msgCount); dbg("msg %04X w=%08X l=%08X", m, (unsigned)w, (unsigned)l); }
+#endif
     Grid* g = (Grid*)GetWindowLongPtrW(h, GWLP_USERDATA);
     switch (m) {
     case WM_NCCREATE:
@@ -1359,6 +1363,7 @@ extern "C" {
 
 int PGAPI PG_Initialize(void)
 {
+    dbg("PG_Initialize enter count=%ld", g_initCount);
     if (InterlockedIncrement(&g_initCount) > 1) return 1;
     HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_SINGLE_THREADED,
         __uuidof(ID2D1Factory), NULL, (void**)&g_d2d);
@@ -1390,6 +1395,7 @@ void PGAPI PG_Shutdown(void)
 HPG PGAPI PG_Create(HWND hwndParent, int x, int y, int w, int h,
                     unsigned long style)
 {
+    dbg("PG_Create enter parent=%p xywh=%d,%d,%d,%d style=%lu", hwndParent, x, y, w, h, style);
     if (!g_d2d && !PG_Initialize()) return NULL;
     Grid* g = (Grid*)calloc(1, sizeof(Grid));
     if (!g) return NULL;
@@ -1420,9 +1426,14 @@ HPG PGAPI PG_Create(HWND hwndParent, int x, int y, int w, int h,
         WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL | WS_TABSTOP,
         x, y, w, h, hwndParent, NULL, GetModuleHandleW(NULL), g);
     if (!hw) { free(g); return NULL; }
+    /* Clarion SHEET/TAB and other native siblings can sit above us in the
+       z-order and paint over the grid - pin it to the top of its siblings */
+    SetWindowPos(hw, HWND_TOP, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     g->dpi = WindowDpi(hw);
     for (int i = PGF_NAME; i <= PGF_DESC; i++) RebuildFormat(g, i);
     RebuildEditFont(g);
+    dbg("PG_Create exit hwnd=%p g=%p dpi=%u", hw, g, g->dpi);
     return (HPG)g;
 }
 
@@ -1453,7 +1464,7 @@ void PGAPI PG_SetPos(HPG pg, int x, int y, int w, int h)
     Grid* g = (Grid*)pg;
     if (!g || !g->hwnd) return;
     CloseEditors(g, TRUE);
-    MoveWindow(g->hwnd, x, y, w, h, TRUE);
+    SetWindowPos(g->hwnd, HWND_TOP, x, y, w, h, SWP_NOACTIVATE);
 }
 
 HWND PGAPI PG_GetHwnd(HPG pg)

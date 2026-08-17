@@ -60,6 +60,7 @@
 #AT(%BeforeGenerateApplication),WHERE(%PGGDisable=0)
   #CALL(%AddCategory(ABC),'PROPGRID')
   #CALL(%SetCategoryLocationFromPrompts(ABC),'PROPGRID','PropGrid','')
+  #PDEFINE('_PropGridModesSet_',1)
 #ENDAT
 #!
 #AT(%AfterGlobalIncludes),WHERE(%PGGDisable=0)

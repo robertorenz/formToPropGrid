@@ -14,6 +14,18 @@
   OMIT('_EndOfInclude_',_PropGridPresent_)
 _PropGridPresent_  EQUATE(1)
 
+!---- link/dll mode defaults ----------------------------------------
+! Template-generated apps define _PropGridModesSet_ plus the two mode
+! pragmas through the ABC 'PROPGRID' class category.  A hand-coded
+! project that defines nothing gets safe single-EXE defaults here:
+! the class code LINKs in and nothing is imported from a DLL.  With
+! NO values at all the DLL() attribute is undefined and every virtual
+! call dies with an access violation - so never remove this block.
+  OMIT('_EndOfModes_',_PropGridModesSet_)
+_PropGridLinkMode_ EQUATE(1)
+_PropGridDllMode_  EQUATE(0)
+  _EndOfModes_
+
 !---- editor types (match PGT_* in propgrid.h) -----------------------
 PGT:Text        EQUATE(1)
 PGT:Password    EQUATE(2)

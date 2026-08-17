@@ -16,6 +16,16 @@ wraps it, and the `ClaPropGrid` template set wires it into an ABC application.
 Everything must be saved **ANSI** (no UTF-8 BOM) with **CRLF** line endings. A BOM breaks
 both the Clarion compiler and the template parser.
 
+> **Hand-coded projects need no pragma defines.** `PropGrid.inc` defaults
+> `_PropGridLinkMode_=>1` / `_PropGridDllMode_=>0` when `_PropGridModesSet_` is absent, so a
+> plain `.cwproj` just compiles `PropGrid.clw` and links `propgrid.lib`. Template-generated
+> apps set all three through the `PROPGRID` ABC class category (the global extension emits
+> `_PropGridModesSet_` via `#PDEFINE`), which also enables the multi-DLL overrides. Do not
+> define the two mode pragmas *without* the guard — it works but produces "Label duplicated"
+> warnings, and in a multi-DLL consumer the include's defaults would win and re-link the
+> class. Without any of this, an undefined `DLL()` attribute on the class makes every
+> virtual method call crash with an access violation at a garbage address.
+
 ---
 
 ## 1. The import library `propgrid.lib` — nothing to do
