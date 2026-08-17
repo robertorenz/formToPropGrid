@@ -1,0 +1,212 @@
+#!=============================================================================
+#!  ClaPropGrid.tpw  -  shared #GROUPs for the ClaPropGrid template set.
+#!  #INCLUDEd from ClaPropGrid.tpl.  Nothing but #GROUPs lives in here, and
+#!  a #GROUP has no end marker, so this file must contain NO #AT / #EMBED.
+#!=============================================================================
+#!
+#!-----------------------------------------------------------------------------
+#! %PGAppearancePrompts - style / font / metric prompts.  #INSERTed by BOTH
+#! templates, so the symbol names are deliberately shared.
+#!-----------------------------------------------------------------------------
+#GROUP(%PGAppearancePrompts)
+  #BOXED('Grid style')
+    #PROMPT('Thin &border',CHECK),%PGStyleBorder,DEFAULT(1),AT(10)
+    #PROMPT('&Description pane at the bottom',CHECK),%PGStyleDesc,DEFAULT(1),AT(10)
+    #PROMPT('&Toolbox look (flat category headers)',CHECK),%PGStyleToolbox,DEFAULT(0),AT(10)
+    #PROMPT('&Sort rows alphabetically',CHECK),%PGStyleSort,DEFAULT(0),AT(10)
+  #ENDBOXED
+  #BOXED('Name column font')
+    #PROMPT('Fa&ce:',@s32),%PGFontNameFace,DEFAULT('Segoe UI'),REQ
+    #PROMPT('Si&ze (pt):',SPIN(@n3,6,48,1)),%PGFontNameSize,DEFAULT(9)
+    #PROMPT('B&old',CHECK),%PGFontNameBold,DEFAULT(0),AT(10)
+  #ENDBOXED
+  #BOXED('Value column font')
+    #PROMPT('Fac&e:',@s32),%PGFontValFace,DEFAULT('Segoe UI'),REQ
+    #PROMPT('Size (&pt):',SPIN(@n3,6,48,1)),%PGFontValSize,DEFAULT(9)
+    #PROMPT('Bol&d',CHECK),%PGFontValBold,DEFAULT(0),AT(10)
+  #ENDBOXED
+  #BOXED('Category header font')
+    #PROMPT('F&ace:',@s32),%PGFontCatFace,DEFAULT('Segoe UI'),REQ
+    #PROMPT('Size (p&t):',SPIN(@n3,6,48,1)),%PGFontCatSize,DEFAULT(9)
+    #PROMPT('Bold (categor&y)',CHECK),%PGFontCatBold,DEFAULT(1),AT(10)
+  #ENDBOXED
+  #BOXED('Metrics')
+    #PROMPT('&Row height in pixels (0 = automatic from the fonts):',SPIN(@n3,0,200,1)),%PGRowHeight,DEFAULT(0)
+    #PROMPT('Splitter (na&me column width) in pixels:',SPIN(@n4,40,2000,10)),%PGSplitter,DEFAULT(150)
+  #ENDBOXED
+#!
+#!-----------------------------------------------------------------------------
+#! %PGColourPrompts - every colour slot the DLL exposes.
+#! NOTE Clarion (and Win32 COLORREF) store colours as 0BBGGRRh, so the hex
+#! digits read blue-green-red.  Use the colour picker and you never have to
+#! think about it.
+#!-----------------------------------------------------------------------------
+#GROUP(%PGColourPrompts)
+  #BOXED('Grid')
+    #PROMPT('&Background:',COLOR),%PGColBack,DEFAULT(00FFFFFFH)
+    #PROMPT('Grid &lines:',COLOR),%PGColLines,DEFAULT(00DCDCDCH)
+  #ENDBOXED
+  #BOXED('Name column')
+    #PROMPT('Bac&kground:',COLOR),%PGColNameBack,DEFAULT(00F5F5F5H)
+    #PROMPT('Te&xt:',COLOR),%PGColNameText,DEFAULT(00202020H)
+  #ENDBOXED
+  #BOXED('Value column')
+    #PROMPT('Tex&t:',COLOR),%PGColValueText,DEFAULT(00303030H)
+  #ENDBOXED
+  #BOXED('Category header')
+    #PROMPT('Backgroun&d:',COLOR),%PGColCatBack,DEFAULT(00E4E9F0H)
+    #PROMPT('Tex&t colour:',COLOR),%PGColCatText,DEFAULT(005F3A1FH)
+  #ENDBOXED
+  #BOXED('Selected row')
+    #PROMPT('Back&ground colour:',COLOR),%PGColSelBack,DEFAULT(00D6E4F5H)
+    #PROMPT('Text co&lour:',COLOR),%PGColSelText,DEFAULT(00202020H)
+  #ENDBOXED
+  #BOXED('Description pane')
+    #PROMPT('Backgroun&d colour:',COLOR),%PGColDescBack,DEFAULT(00FAFAFAH)
+    #PROMPT('Text colo&ur:',COLOR),%PGColDescText,DEFAULT(00404040H)
+  #ENDBOXED
+#!
+#!-----------------------------------------------------------------------------
+#! %PGStyleNumber - the PGS_xxx bit mask as a NUMBER, evaluated at generate
+#! time so the emitted call carries a plain literal.
+#!-----------------------------------------------------------------------------
+#GROUP(%PGStyleNumber)
+  #RETURN(%PGStyleBorder + 2 * %PGStyleDesc + 4 * %PGStyleToolbox + 8 * %PGStyleSort)
+#!
+#!-----------------------------------------------------------------------------
+#! %PGEmitAppearance(object) - the SetFont / SetColor / metric calls.
+#! Emitted at column 5 (inside the generated IF ... END block).
+#!-----------------------------------------------------------------------------
+#GROUP(%PGEmitAppearance,%pObj)
+    %pObj.SetFont(PGF:Name,'%PGFontNameFace',%PGFontNameSize,%PGFontNameBold,0)
+    %pObj.SetFont(PGF:Value,'%PGFontValFace',%PGFontValSize,%PGFontValBold,0)
+    %pObj.SetFont(PGF:Category,'%PGFontCatFace',%PGFontCatSize,%PGFontCatBold,0)
+    %pObj.SetFont(PGF:Desc,'%PGFontValFace',%PGFontValSize,0,0)
+    %pObj.SetColor(PGC:Back,%PGColBack)
+    %pObj.SetColor(PGC:NameBack,%PGColNameBack)
+    %pObj.SetColor(PGC:NameText,%PGColNameText)
+    %pObj.SetColor(PGC:ValueText,%PGColValueText)
+    %pObj.SetColor(PGC:CatBack,%PGColCatBack)
+    %pObj.SetColor(PGC:CatText,%PGColCatText)
+    %pObj.SetColor(PGC:Lines,%PGColLines)
+    %pObj.SetColor(PGC:SelBack,%PGColSelBack)
+    %pObj.SetColor(PGC:SelText,%PGColSelText)
+    %pObj.SetColor(PGC:DescBack,%PGColDescBack)
+    %pObj.SetColor(PGC:DescText,%PGColDescText)
+  #IF(%PGRowHeight)
+    %pObj.SetRowHeight(%PGRowHeight)
+  #ENDIF
+  #IF(%PGSplitter)
+    %pObj.SetSplitter(%PGSplitter)
+  #ENDIF
+#!
+#!-----------------------------------------------------------------------------
+#! %PGEditorEquate(editor text) - map the DROP choice to the PGT: equate.
+#!-----------------------------------------------------------------------------
+#GROUP(%PGEditorEquate,%pEditor)
+  #CASE(%pEditor)
+  #OF('Password')
+    #RETURN('PGT:Password')
+  #OF('Drop list')
+    #RETURN('PGT:Drop')
+  #OF('Checkbox')
+    #RETURN('PGT:Check')
+  #OF('Radio')
+    #RETURN('PGT:Radio')
+  #OF('Slider')
+    #RETURN('PGT:Slider')
+  #OF('Spin')
+    #RETURN('PGT:Spin')
+  #OF('Button')
+    #RETURN('PGT:Button')
+  #OF('Color')
+    #RETURN('PGT:Color')
+  #OF('Date')
+    #RETURN('PGT:Date')
+  #OF('Time')
+    #RETURN('PGT:Time')
+  #OF('Multiline')
+    #RETURN('PGT:MultiText')
+  #OF('Read only')
+    #RETURN('PGT:ReadOnly')
+  #ELSE
+    #RETURN('PGT:Text')
+  #ENDCASE
+#!
+#!-----------------------------------------------------------------------------
+#! %PGFieldPictureToUse - the picture used for a Date / Time row.
+#!-----------------------------------------------------------------------------
+#GROUP(%PGFieldPictureToUse)
+  #IF(%PGFieldPicture)
+    #RETURN(%PGFieldPicture)
+  #ENDIF
+  #IF(%PGFieldEditor = 'Time')
+    #RETURN('@t4')
+  #ENDIF
+  #RETURN('@d17')
+#!
+#!-----------------------------------------------------------------------------
+#! %PGDefaultLabel - display name for a field row: the prompt value if the
+#! developer supplied one, otherwise the variable name with its prefix and
+#! any leading '?' stripped.
+#!-----------------------------------------------------------------------------
+#GROUP(%PGDefaultLabel)
+  #IF(VAREXISTS(%pgTxt) = 0)
+    #DECLARE(%pgTxt)
+  #ENDIF
+  #IF(VAREXISTS(%pgPos) = 0)
+    #DECLARE(%pgPos)
+  #ENDIF
+  #IF(%PGFieldName)
+    #RETURN(%PGFieldName)
+  #ENDIF
+  #SET(%pgTxt,CLIP(%PGFieldVar))
+  #IF(SUB(%pgTxt,1,1) = '?')
+    #SET(%pgTxt,SUB(%pgTxt,2,LEN(%pgTxt)))
+  #ENDIF
+  #SET(%pgPos,INSTRING(':',%pgTxt,1,1))
+  #IF(%pgPos)
+    #SET(%pgTxt,SUB(%pgTxt,%pgPos + 1,LEN(%pgTxt)))
+  #ENDIF
+  #IF(%pgTxt = '')
+    #RETURN('Field')
+  #ENDIF
+  #RETURN(%pgTxt)
+#!
+#!-----------------------------------------------------------------------------
+#! %PGGetOkControl / %PGGetCancelControl - the developer's choice, or ?OK /
+#! ?Cancel when they exist on this window and nothing was chosen.  Used from
+#! a lazy #EQUATE so the value is available to the #AT embed matcher
+#! (a #DECLARE + #SET is NOT - see ABASCII.TPW:237 for the idiom).
+#!-----------------------------------------------------------------------------
+#GROUP(%PGGetOkControl)
+  #IF(VAREXISTS(%pgCtl) = 0)
+    #DECLARE(%pgCtl)
+  #ENDIF
+  #IF(%F2POk)
+    #RETURN(%F2POk)
+  #ENDIF
+  #SET(%pgCtl,'')
+  #FOR(%Control),WHERE(UPPER(%Control) = '?OK')
+    #SET(%pgCtl,%Control)
+    #BREAK
+  #ENDFOR
+  #RETURN(%pgCtl)
+#!
+#GROUP(%PGGetCancelControl)
+  #IF(VAREXISTS(%pgCtl) = 0)
+    #DECLARE(%pgCtl)
+  #ENDIF
+  #IF(%F2PCancel)
+    #RETURN(%F2PCancel)
+  #ENDIF
+  #SET(%pgCtl,'')
+  #FOR(%Control),WHERE(UPPER(%Control) = '?CANCEL')
+    #SET(%pgCtl,%Control)
+    #BREAK
+  #ENDFOR
+  #RETURN(%pgCtl)
+#!
+#!=============================================================================
+#! End of ClaPropGrid.tpw
+#!=============================================================================

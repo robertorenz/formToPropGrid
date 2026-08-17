@@ -27,6 +27,21 @@
 #pragma comment(lib, "comctl32.lib")
 #pragma comment(lib, "comdlg32.lib")
 
+#ifdef PG_DEBUG
+#include <stdio.h>
+#include <stdarg.h>
+static void dbg(const char* fmt, ...)
+{
+    char buf[512]; va_list ap; va_start(ap, fmt);
+    vsnprintf(buf, 512, fmt, ap); va_end(ap);
+    FILE* f = NULL;
+    fopen_s(&f, "C:\\ai\\formtopropertygrid\\bin\\pgdebug.log", "a");
+    if (f) { fputs(buf, f); fputs("\n", f); fclose(f); }
+}
+#else
+#define dbg(...) ((void)0)
+#endif
+
 /*------------------------------------------------------------------*/
 /* constants                                                        */
 /*------------------------------------------------------------------*/
@@ -428,6 +443,9 @@ static void CommitEdit(Grid* g, BOOL keep)
 
 static void CloseList(Grid* g, BOOL keep)
 {
+#ifdef PG_DEBUG
+    if (g->hList) dbg("CloseList keep=%d inCommit=%d", keep, g->inCommit);
+#endif
     if (!g->hList || g->inCommit) return;
     g->inCommit = TRUE;
     HWND h = g->hList; int id = g->listProp;
@@ -576,6 +594,7 @@ static void BeginEdit(Grid* g, int id, WCHAR firstChar)
 static void OpenList(Grid* g, int id)
 {
     Prop* p = PROP(g, id);
+    dbg("OpenList id=%d p=%p ro=%d choices=%p", id, p, p ? p->readOnly : -1, p ? p->choices : 0);
     if (!p || p->readOnly || !p->choices || !*p->choices) return;
     CloseEditors(g, TRUE);
     RECT row; if (!PropRowRect(g, id, &row)) return;
@@ -587,10 +606,11 @@ static void OpenList(Grid* g, int id)
     for (c = p->choices; *c; c++) if (*c == L'|') n++;
     int rh = RowH(g);
     int lh = n * (rh - 2) + 4; if (lh > 8 * rh) lh = 8 * rh;
-    g->hList = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST | WS_EX_NOACTIVATE,
+    g->hList = CreateWindowExW(WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
         L"LISTBOX", L"", WS_POPUP | WS_BORDER | WS_VSCROLL | LBS_NOTIFY | LBS_NOINTEGRALHEIGHT,
         pt.x, pt.y, cell.right - cell.left, lh,
         g->hwnd, NULL, (HINSTANCE)GetModuleHandleW(NULL), NULL);
+    dbg("OpenList hList=%p err=%d", g->hList, (int)GetLastError());
     if (!g->hList) return;
     g->listProp = id;
     if (g->hEditFont) SendMessageW(g->hList, WM_SETFONT, (WPARAM)g->hEditFont, TRUE);
@@ -606,7 +626,7 @@ static void OpenList(Grid* g, int id)
     free(dup);
     if (selIdx >= 0) SendMessageW(g->hList, LB_SETCURSEL, selIdx, 0);
     SetWindowSubclass(g->hList, ListSub, 1, (DWORD_PTR)g);
-    ShowWindow(g->hList, SW_SHOWNOACTIVATE);
+    ShowWindow(g->hList, SW_SHOW);
     SetFocus(g->hList);
 }
 

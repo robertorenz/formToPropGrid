@@ -20,6 +20,9 @@ echo --- building testhost.exe (x86) ---
 cl /nologo /W3 /O2 /MT testhost.c /Fe..\bin\testhost.exe ^
    /link /SUBSYSTEM:WINDOWS ..\bin\propgrid.lib user32.lib || exit /b 1
 
+echo --- generating Clarion import library (all Clarion versions) ---
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0make-clarion-lib.ps1" || exit /b 1
+
 del *.obj 2>nul
-echo Build OK: ..\bin\propgrid.dll  ..\bin\testhost.exe
+echo Build OK: ..\bin\propgrid.dll  ..\bin\testhost.exe  ..\clarion\propgrid.lib
 endlocal

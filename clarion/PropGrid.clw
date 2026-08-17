@@ -1,5 +1,22 @@
 !=====================================================================
 ! PropGrid.clw - implementation of PropGridClass (see PropGrid.inc)
+!
+! Runtime facts this code relies on (all verified on Clarion 12 by
+! probing a live window - see INSTALL.md "Verified runtime notes"):
+!   * ?ctl{PROP:Text} on an ENTRY/SPIN returns the picture WITHOUT the
+!     leading '@'  ->  'd17', 'n-9.2', 's30'.  ControlPicture() adds it.
+!   * CONTENTS(feq) returns the RAW USE variable value, never the
+!     formatted display text, so @D/@T values must be FORMAT()ed.
+!   * CHANGE(feq,value) assigns the USE variable with a plain
+!     string->numeric conversion. Feeding it a REAL loses the decimal
+!     point, so numbers go through a LONG (dates/times) or the raw
+!     text (everything else).
+!   * OPTION: write with feq{PROP:Selected} = ordinal (that honours a
+!     RADIO's VALUE attribute); CHANGE() on an OPTION corrupts it.
+!   * CHECK : PROP:Checked is READ ONLY. Write with
+!     CHANGE(feq, PROP:TrueValue / PROP:FalseValue), defaulting to 1/0.
+!   * PROP:From reads back only for a string FROM(); a queue-driven
+!     DROP is enumerated by walking PROP:Selected 1..PROP:Items.
 !=====================================================================
   MEMBER
 
@@ -7,12 +24,19 @@
   INCLUDE('PROPGRID.INC'),ONCE
 
   MAP
-    MODULE('PROPGRID.DLL')
-PG_Initialize      PROCEDURE(),SIGNED,PASCAL,NAME('PG_Initialize')
+!   NOTE: the MODULE() label below must NOT be 'PROPGRID.DLL'.  Clarion
+!   strips the extension and compares the result with the name of the
+!   module being compiled - PropGrid.clw - decides these prototypes are
+!   defined HERE, and every one of them fails with
+!   "Missing procedure definition: PG_CREATE((LONG,...)".  The label is
+!   only a grouping name; binding is by NAME() plus propgrid.lib.
+    MODULE('ClaPropGridDLL')
+PG_Initialize      PROCEDURE(),SIGNED,PROC,PASCAL,NAME('PG_Initialize')
 PG_Shutdown        PROCEDURE(),PASCAL,NAME('PG_Shutdown')
 PG_Create          PROCEDURE(UNSIGNED hwndParent, SIGNED x, SIGNED y, SIGNED w, SIGNED h, ULONG style),LONG,PASCAL,NAME('PG_Create')
 PG_Destroy         PROCEDURE(LONG pg),PASCAL,NAME('PG_Destroy')
 PG_SetPos          PROCEDURE(LONG pg, SIGNED x, SIGNED y, SIGNED w, SIGNED h),PASCAL,NAME('PG_SetPos')
+PG_GetHwnd         PROCEDURE(LONG pg),UNSIGNED,PASCAL,NAME('PG_GetHwnd')
 PG_SetFont         PROCEDURE(LONG pg, SIGNED part, *CSTRING face, SIGNED sizePt, SIGNED bold, SIGNED italic),PASCAL,RAW,NAME('PG_SetFont')
 PG_SetColor        PROCEDURE(LONG pg, SIGNED slot, LONG color),PASCAL,NAME('PG_SetColor')
 PG_SetRowHeight    PROCEDURE(LONG pg, SIGNED px),PASCAL,NAME('PG_SetRowHeight')
@@ -28,7 +52,7 @@ PG_SetExpanded     PROCEDURE(LONG pg, SIGNED category, SIGNED expanded),PASCAL,N
 PG_SetTag          PROCEDURE(LONG pg, SIGNED row, LONG tag),PASCAL,NAME('PG_SetTag')
 PG_GetTag          PROCEDURE(LONG pg, SIGNED row),LONG,PASCAL,NAME('PG_GetTag')
 PG_SetValue        PROCEDURE(LONG pg, SIGNED row, *CSTRING value),PASCAL,RAW,NAME('PG_SetValue')
-PG_GetValue        PROCEDURE(LONG pg, SIGNED row, *CSTRING buf, SIGNED bufLen),SIGNED,PASCAL,RAW,NAME('PG_GetValue')
+PG_GetValue        PROCEDURE(LONG pg, SIGNED row, *CSTRING buf, SIGNED bufLen),SIGNED,PROC,PASCAL,RAW,NAME('PG_GetValue')
 PG_GetRowCount     PROCEDURE(LONG pg),SIGNED,PASCAL,NAME('PG_GetRowCount')
 PG_FindRow         PROCEDURE(LONG pg, *CSTRING propName),SIGNED,PASCAL,RAW,NAME('PG_FindRow')
 PG_GetSelected     PROCEDURE(LONG pg),SIGNED,PASCAL,NAME('PG_GetSelected')
@@ -37,19 +61,36 @@ PG_Redraw          PROCEDURE(LONG pg),PASCAL,NAME('PG_Redraw')
     END
   END
 
+PGInitDone   BYTE(0)                        ! PG_Initialize() is once per process
+
 !---------------------------------------------------------------------
 PropGridClass.Construct PROCEDURE()
   CODE
   SELF.PG            = 0
+  SELF.Win          &= NULL
   SELF.RegionFeq     = 0
+  SELF.DockMode      = PGD:Region
+  SELF.DockSize      = 0
+  SELF.MarginX       = 0
+  SELF.MarginY       = 0
+  SELF.Style         = PGS:Border + PGS:Description
   SELF.LiveSync      = 0
   SELF.HideOriginals = 1
   SELF.Initialized   = 0
+  SELF.TimerInterval = 10
+  SELF.MaxScanItems  = 500
+  SELF.NextPrompt    = 0
 
 PropGridClass.Destruct PROCEDURE()
   CODE
-  SELF.Kill()
+  IF SELF.PG
+    PG_Destroy(SELF.PG)
+    SELF.PG = 0
+  END
+  SELF.Initialized = 0
 
+!---------------------------------------------------------------------
+! lifetime
 !---------------------------------------------------------------------
 PropGridClass.Init PROCEDURE(WINDOW W, SIGNED regionFeq, ULONG style=3)
 x   SIGNED
@@ -66,19 +107,27 @@ sav BYTE
   wd = regionFeq{PROP:Width}
   ht = regionFeq{PROP:Height}
   0{PROP:Pixels} = sav
-  regionFeq{PROP:Hide} = TRUE
   SETTARGET()
   SELF.RegionFeq = regionFeq
+  SELF.DockMode  = PGD:Region
   RETURN SELF.InitXY(W, x, y, wd, ht, style)
 
 PropGridClass.InitXY PROCEDURE(WINDOW W, SIGNED x, SIGNED y, SIGNED width, SIGNED height, ULONG style=3)
   CODE
   IF SELF.PG THEN SELF.Kill().
   SELF.Win &= W
-  PG_Initialize()
+  SELF.Style = style
+  IF ~PGInitDone
+    PG_Initialize()
+    PGInitDone = 1
+  END
+  IF width < 1 THEN width = 1.
+  IF height < 1 THEN height = 1.
   SELF.PG = PG_Create(W{PROP:Handle}, x, y, width, height, style)
   IF ~SELF.PG THEN RETURN 0.
-  IF W{PROP:Timer} = 0 THEN W{PROP:Timer} = 10.   ! event pump needs a timer
+  IF SELF.TimerInterval > 0 AND W{PROP:Timer} = 0
+    W{PROP:Timer} = SELF.TimerInterval             ! the event pump needs a timer
+  END
   SELF.Initialized = 1
   RETURN 1
 
@@ -90,25 +139,71 @@ PropGridClass.Kill PROCEDURE()
   END
   SELF.Initialized = 0
 
+PropGridClass.SetDock PROCEDURE(BYTE mode, SIGNED size=0, SIGNED marginX=0, SIGNED marginY=0)
+  CODE
+  SELF.DockMode = mode
+  SELF.DockSize = size
+  SELF.MarginX  = marginX
+  SELF.MarginY  = marginY
+
+PropGridClass.SetPos PROCEDURE(SIGNED x, SIGNED y, SIGNED width, SIGNED height)
+  CODE
+  IF ~SELF.PG THEN RETURN.
+  IF width < 1 THEN width = 1.
+  IF height < 1 THEN height = 1.
+  PG_SetPos(SELF.PG, x, y, width, height)
+
 PropGridClass.Reposition PROCEDURE()
 x   SIGNED
 y   SIGNED
 wd  SIGNED
 ht  SIGNED
+cw  SIGNED
+ch  SIGNED
 sav BYTE
   CODE
-  IF ~SELF.PG OR ~SELF.RegionFeq THEN RETURN.
+  IF ~SELF.PG THEN RETURN.
+  IF SELF.DockMode = PGD:Fixed THEN RETURN.
+  IF SELF.DockMode = PGD:Region AND ~SELF.RegionFeq THEN RETURN.
+  x  = 0
+  y  = 0
+  wd = 0
+  ht = 0
   SETTARGET(SELF.Win)
   sav = 0{PROP:Pixels}
   0{PROP:Pixels} = TRUE
-  x  = SELF.RegionFeq{PROP:XPos}
-  y  = SELF.RegionFeq{PROP:YPos}
-  wd = SELF.RegionFeq{PROP:Width}
-  ht = SELF.RegionFeq{PROP:Height}
+  IF SELF.DockMode = PGD:Region
+    x  = SELF.RegionFeq{PROP:XPos}
+    y  = SELF.RegionFeq{PROP:YPos}
+    wd = SELF.RegionFeq{PROP:Width}
+    ht = SELF.RegionFeq{PROP:Height}
+  ELSE
+    cw = 0{PROP:Width}
+    ch = 0{PROP:Height}
+    CASE SELF.DockMode
+    OF PGD:Left
+      x  = SELF.MarginX
+      y  = SELF.MarginY
+      wd = SELF.DockSize
+      ht = ch - 2 * SELF.MarginY
+    OF PGD:Right
+      x  = cw - SELF.DockSize - SELF.MarginX
+      y  = SELF.MarginY
+      wd = SELF.DockSize
+      ht = ch - 2 * SELF.MarginY
+    ELSE                                            ! PGD:Fill
+      x  = SELF.MarginX
+      y  = SELF.MarginY
+      wd = cw - 2 * SELF.MarginX
+      ht = ch - 2 * SELF.MarginY
+    END
+  END
   0{PROP:Pixels} = sav
   SETTARGET()
-  PG_SetPos(SELF.PG, x, y, wd, ht)
+  SELF.SetPos(x, y, wd, ht)
 
+!---------------------------------------------------------------------
+! appearance
 !---------------------------------------------------------------------
 PropGridClass.SetFont PROCEDURE(SHORT part, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)
 cFace CSTRING(128)
@@ -130,6 +225,8 @@ PropGridClass.SetSplitter PROCEDURE(SHORT px)
   IF SELF.PG THEN PG_SetSplitter(SELF.PG, px).
 
 !---------------------------------------------------------------------
+! building
+!---------------------------------------------------------------------
 PropGridClass.ClearAll PROCEDURE()
   CODE
   IF SELF.PG THEN PG_Clear(SELF.PG).
@@ -143,7 +240,7 @@ cName CSTRING(256)
 
 PropGridClass.AddProperty PROCEDURE(SIGNED category, STRING propName, SHORT propType, STRING value)
 cName CSTRING(256)
-cVal  CSTRING(4096)
+cVal  CSTRING(4097)
   CODE
   IF ~SELF.PG THEN RETURN 0.
   cName = CLIP(propName)
@@ -151,7 +248,7 @@ cVal  CSTRING(4096)
   RETURN PG_AddProperty(SELF.PG, category, cName, propType, cVal)
 
 PropGridClass.SetChoices PROCEDURE(SIGNED row, STRING choices)
-cCho CSTRING(4096)
+cCho CSTRING(4097)
   CODE
   IF ~SELF.PG THEN RETURN.
   cCho = CLIP(choices)
@@ -162,7 +259,7 @@ PropGridClass.SetRange PROCEDURE(SIGNED row, REAL low, REAL high, REAL step=1)
   IF SELF.PG THEN PG_SetRange(SELF.PG, row, low, high, step).
 
 PropGridClass.SetDescription PROCEDURE(SIGNED row, STRING txt)
-cTxt CSTRING(2048)
+cTxt CSTRING(2049)
   CODE
   IF ~SELF.PG THEN RETURN.
   cTxt = CLIP(txt)
@@ -186,15 +283,17 @@ PropGridClass.GetTag PROCEDURE(SIGNED row)
   RETURN PG_GetTag(SELF.PG, row)
 
 !---------------------------------------------------------------------
+! values
+!---------------------------------------------------------------------
 PropGridClass.SetValue PROCEDURE(SIGNED row, STRING value)
-cVal CSTRING(4096)
+cVal CSTRING(4097)
   CODE
   IF ~SELF.PG THEN RETURN.
   cVal = CLIP(value)
   PG_SetValue(SELF.PG, row, cVal)
 
 PropGridClass.GetValue PROCEDURE(SIGNED row)
-buf CSTRING(4096)
+buf CSTRING(4097)
   CODE
   IF ~SELF.PG THEN RETURN ''.
   buf = ''
@@ -221,17 +320,22 @@ PropGridClass.RowCount PROCEDURE()
 !---------------------------------------------------------------------
 ! AddControl - create one grid row from an existing window control.
 ! Uses runtime reflection: control type, picture, range, choices.
+! Returns the new row id, or 0 when the control has no grid equivalent.
 !---------------------------------------------------------------------
 PropGridClass.AddControl PROCEDURE(SIGNED feq, SIGNED category=0)
-ctype    LONG
-row      SIGNED
-lbl      STRING(256)
-val      STRING(4096)
-cho      STRING(4096)
-pic      STRING(64)
-ptype    SHORT
-child    SIGNED
-i        SIGNED
+ctype LONG
+row   SIGNED
+lbl   STRING(256)
+val   STRING(4096)
+cho   STRING(4096)
+pic   STRING(64)
+tip   STRING(256)
+ptype SHORT
+lv    LONG
+lo    REAL
+hi    REAL
+st    REAL
+ro    BYTE
   CODE
   IF ~SELF.PG THEN RETURN 0.
   SETTARGET(SELF.Win)
@@ -240,196 +344,191 @@ i        SIGNED
   SELF.NextPrompt = 0
   ptype = 0
   cho   = ''
-  val   = CONTENTS(feq)
+  val   = ''
+  lo    = 0
+  hi    = 0
+  st    = 1
   CASE ctype
-  OF CREATE:entry
-    pic = feq{PROP:Text}
-    IF feq{PROP:Password}
-      ptype = PGT:Password
-    ELSIF UPPER(SUB(pic,1,2)) = '@D'
+  OF CREATE:entry OROF CREATE:spin OROF CREATE:singleline
+    pic = SELF.ControlPicture(feq)
+    CASE UPPER(SUB(pic,2,1))
+    OF 'D'
       ptype = PGT:Date
-    ELSIF UPPER(SUB(pic,1,2)) = '@T'
+    OF 'T'
       ptype = PGT:Time
     ELSE
-      ptype = PGT:Text
+      IF feq{PROP:Password}
+        ptype = PGT:Password
+      ELSIF ctype = CREATE:spin
+        ptype = PGT:Spin
+      ELSE
+        ptype = PGT:Text
+      END
     END
-  OF CREATE:spin
-    ptype = PGT:Spin
-  OF CREATE:check
+    IF ptype = PGT:Date OR ptype = PGT:Time
+      lv  = CONTENTS(feq)                          ! CONTENTS is the RAW value
+      val = FORMAT(lv, pic)
+    ELSE
+      val = CONTENTS(feq)
+    END
+    IF ctype = CREATE:spin
+      lo = feq{PROP:RangeLow}
+      hi = feq{PROP:RangeHigh}
+      st = feq{PROP:Step}
+    END
+  OF CREATE:slider
+    ptype = PGT:Slider
+    val   = CONTENTS(feq)
+    lo    = feq{PROP:RangeLow}
+    hi    = feq{PROP:RangeHigh}
+    st    = feq{PROP:Step}
+  OF CREATE:check OROF CREATE:state3
     ptype = PGT:Check
-    val   = CHOOSE(feq{PROP:Checked} = TRUE, '1', '0')
+    val   = CHOOSE(feq{PROP:Checked} = 1, '1', '0')
   OF CREATE:option
     ptype = PGT:Radio
-    ! collect radio-button children as choices
-    i = 1
-    LOOP
-      child = feq{PROP:Child, i}
-      IF ~child THEN BREAK.
-      IF child{PROP:Type} = CREATE:radio
-        cho = CLIP(cho) & CHOOSE(cho = '', '', '|') & CLIP(SELF.ControlLabel(child, 0))
-      END
-      i += 1
+    cho   = SELF.ChildLabels(feq)
+    val   = SELF.ChildLabelAt(feq, CHOICE(feq))
+  OF CREATE:list OROF CREATE:combo OROF CREATE:droplist OROF CREATE:dropcombo
+    IF feq{PROP:Drop}                              ! a plain browse LIST is not a property
+      ptype = PGT:Drop
+      cho   = SELF.ListChoices(feq)
+      val   = CONTENTS(feq)
     END
-    i = CHOICE(feq)
-    IF i > 0 THEN val = SELF.ControlLabel(feq{PROP:Child, i}, 0).
-  OF CREATE:droplist OROF CREATE:dropcombo OROF CREATE:list OROF CREATE:combo
-    ptype = PGT:Drop
-    cho   = feq{PROP:From}
-  OF CREATE:text
+  OF CREATE:text OROF CREATE:rtf
     ptype = PGT:MultiText
+    val   = CONTENTS(feq)
   OF CREATE:button
     ptype = PGT:Button
     val   = ''
-  OF CREATE:string OROF CREATE:sstring
+  OF CREATE:string OROF CREATE:sstring OROF CREATE:prompt
     ptype = PGT:ReadOnly
     val   = feq{PROP:Text}
-  ELSE
+  END
+  IF ~ptype
     SETTARGET()
     RETURN 0
   END
+  ro = 0
+  IF feq{PROP:ReadOnly} OR feq{PROP:Disable} THEN ro = 1.
+  tip = feq{PROP:Tip}
+  IF st = 0 THEN st = 1.
   SETTARGET()
-  row = SELF.AddProperty(category, lbl, ptype, CLIP(val))
+  row = SELF.AddProperty(category, lbl, ptype, val)
   IF ~row THEN RETURN 0.
   SELF.SetTag(row, feq)
-  IF cho THEN SELF.SetChoices(row, CLIP(cho)).
-  SETTARGET(SELF.Win)
-  IF ctype = CREATE:spin
-    SELF.SetRange(row, feq{PROP:RangeLow}, feq{PROP:RangeHigh}, CHOOSE(feq{PROP:Step} = 0, 1, feq{PROP:Step}))
-  END
-  IF feq{PROP:ReadOnly} OR feq{PROP:Disable} THEN SELF.SetReadOnly(row, 1).
-  IF feq{PROP:Tip} THEN SELF.SetDescription(row, feq{PROP:Tip}).
-  SETTARGET()
+  IF cho <> '' THEN SELF.SetChoices(row, cho).
+  IF hi > lo THEN SELF.SetRange(row, lo, hi, st).
+  IF tip <> '' THEN SELF.SetDescription(row, tip).
+  IF ro THEN SELF.SetReadOnly(row, 1).
   RETURN row
 
 !---------------------------------------------------------------------
 ! BuildFromWindow - walk every control on the window, convert the
-! supported ones into grid rows, hide the originals (and their
-! prompts).  excludeFeqs = pipe list of FEQs to leave alone.
+! supported ones into grid rows and (optionally) hide the originals
+! together with the PROMPT/STRING that labels them.
+! excludeFeqs = pipe-delimited list of FEQs to leave alone.
 !---------------------------------------------------------------------
 PropGridClass.BuildFromWindow PROCEDURE(SIGNED category=0, <STRING excludeFeqs>)
 feq        SIGNED
 ctype      LONG
 row        SIGNED
 added      SIGNED
-promptFeq  SIGNED
+labelFeq   SIGNED
 excl       STRING(1024)
   CODE
   IF ~SELF.PG THEN RETURN 0.
-  excl  = CHOOSE(OMITTED(excludeFeqs), '', '|' & CLIP(excludeFeqs) & '|')
-  added = 0
-  promptFeq = 0
+  IF OMITTED(excludeFeqs)
+    excl = ''
+  ELSE
+    excl = '|' & CLIP(excludeFeqs) & '|'
+  END
+  added    = 0
+  labelFeq = 0
   SETTARGET(SELF.Win)
   LOOP feq = FIRSTFIELD() TO LASTFIELD()
     ctype = feq{PROP:Type}
     IF ~ctype THEN CYCLE.
     IF feq = SELF.RegionFeq THEN CYCLE.
-    IF excl AND INSTRING('|' & feq & '|', excl, 1, 1) THEN CYCLE.
+    IF excl <> '' AND INSTRING('|' & feq & '|', excl, 1, 1) THEN CYCLE.
     IF feq{PROP:Hide} THEN CYCLE.
     CASE ctype
-    OF CREATE:prompt
-      promptFeq = feq
+    OF CREATE:prompt OROF CREATE:string OROF CREATE:sstring
+      labelFeq = feq                               ! label for the NEXT data control
       CYCLE
-    OF CREATE:radio OROF CREATE:sheet OROF CREATE:tab OROF CREATE:group |
-         OROF CREATE:panel OROF CREATE:image OROF CREATE:line          |
-         OROF CREATE:box OROF CREATE:ellipse OROF CREATE:region        |
-         OROF CREATE:menu OROF CREATE:item OROF CREATE:progress
+    OF CREATE:radio OROF CREATE:sheet OROF CREATE:tab OROF CREATE:group    |
+         OROF CREATE:panel OROF CREATE:image OROF CREATE:line              |
+         OROF CREATE:box OROF CREATE:ellipse OROF CREATE:region            |
+         OROF CREATE:menu OROF CREATE:item OROF CREATE:menubar             |
+         OROF CREATE:toolbar OROF CREATE:progress OROF CREATE:custom       |
+         OROF CREATE:ole
       CYCLE
     END
+    SELF.NextPrompt = labelFeq
     SETTARGET()
-    SELF.NextPrompt = promptFeq
     row = SELF.AddControl(feq, category)
     SETTARGET(SELF.Win)
     IF row
       added += 1
       IF SELF.HideOriginals
         feq{PROP:Hide} = TRUE
-        IF promptFeq THEN promptFeq{PROP:Hide} = TRUE.
+        IF labelFeq THEN labelFeq{PROP:Hide} = TRUE.
       END
     END
-    promptFeq = 0
+    labelFeq = 0
   END
   SETTARGET()
   SELF.Redraw()
   RETURN added
 
 !---------------------------------------------------------------------
-PropGridClass.ControlLabel PROCEDURE(SIGNED feq, SIGNED prevPromptFeq)
-txt STRING(256)
-p   SIGNED
-  CODE
-  ! assumes SETTARGET(SELF.Win) is active in the caller
-  IF prevPromptFeq
-    txt = prevPromptFeq{PROP:Text}
-  ELSE
-    txt = feq{PROP:Text}
-    CASE feq{PROP:Type}
-    OF CREATE:entry OROF CREATE:spin OROF CREATE:text |
-         OROF CREATE:droplist OROF CREATE:dropcombo   |
-         OROF CREATE:list OROF CREATE:combo
-      ! PROP:Text is the picture for these - derive from USE label
-      txt = feq{PROP:Use}
-      IF SUB(txt,1,1) = '?' THEN txt = SUB(txt, 2, SIZE(txt) - 1).
-      p = INSTRING(':', txt, 1, 1)          ! strip 'PRE:' prefix
-      IF p THEN txt = SUB(txt, p + 1, SIZE(txt) - p).
-    END
-  END
-  ! strip accelerator '&' and trailing ':'
-  LOOP
-    p = INSTRING('&', txt, 1, 1)
-    IF ~p THEN BREAK.
-    txt = SUB(txt, 1, p - 1) & SUB(txt, p + 1, SIZE(txt) - p)
-  END
-  txt = CLIP(LEFT(txt))
-  IF txt AND SUB(txt, LEN(CLIP(txt)), 1) = ':'
-    txt = SUB(txt, 1, LEN(CLIP(txt)) - 1)
-  END
-  IF ~txt THEN txt = 'Field ' & feq.
-  RETURN CLIP(txt)
-
-!---------------------------------------------------------------------
-! SyncRow - copy one grid value back into the source control/USE var
+! SyncRow - copy one grid value back into the source control / USE var
 !---------------------------------------------------------------------
 PropGridClass.SyncRow PROCEDURE(SIGNED row)
 feq   SIGNED
 val   STRING(4096)
-cho   STRING(4096)
-ctype LONG
 pic   STRING(64)
-i     SIGNED
-n     SIGNED
-child SIGNED
+tv    STRING(64)
+fv    STRING(64)
+ctype LONG
+ord   SIGNED
+lv    LONG
   CODE
+  IF ~SELF.PG THEN RETURN.
   feq = SELF.GetTag(row)
   IF ~feq THEN RETURN.
   val = SELF.GetValue(row)
   SETTARGET(SELF.Win)
   ctype = feq{PROP:Type}
   CASE ctype
-  OF CREATE:check
-    CHANGE(feq, CHOOSE(val = '1', 1, 0))
-  OF CREATE:option
-    ! match the choice text against the radio children -> ordinal
-    n = 0
-    i = 1
-    LOOP
-      child = feq{PROP:Child, i}
-      IF ~child THEN BREAK.
-      IF child{PROP:Type} = CREATE:radio
-        n += 1
-        IF CLIP(SELF.ControlLabel(child, 0)) = CLIP(val)
-          feq{PROP:Selected} = n
-          BREAK
-        END
-      END
-      i += 1
+  OF CREATE:check OROF CREATE:state3
+    tv = feq{PROP:TrueValue}
+    fv = feq{PROP:FalseValue}
+    IF tv = '' THEN tv = '1'.
+    IF fv = '' THEN fv = '0'.
+    IF CLIP(LEFT(val)) = '1' OR UPPER(CLIP(LEFT(val))) = 'TRUE' OR UPPER(CLIP(LEFT(val))) = 'YES'
+      CHANGE(feq, CLIP(tv))
+    ELSE
+      CHANGE(feq, CLIP(fv))
     END
-  OF CREATE:entry OROF CREATE:spin
-    pic = feq{PROP:Text}
-    IF UPPER(SUB(pic,1,1)) = '@' AND INSTRING(UPPER(SUB(pic,2,1)), 'DTN', 1, 1)
-      CHANGE(feq, DEFORMAT(CLIP(val), pic))
+  OF CREATE:option
+    ord = SELF.ChildOrdinal(feq, val)
+    IF ord > 0 THEN feq{PROP:Selected} = ord.       ! honours the RADIO's VALUE()
+  OF CREATE:list OROF CREATE:combo OROF CREATE:droplist OROF CREATE:dropcombo
+    IF ~SELF.ListSelect(feq, val)
+      CHANGE(feq, CLIP(val))
+    END
+  OF CREATE:entry OROF CREATE:spin OROF CREATE:singleline
+    pic = SELF.ControlPicture(feq)
+    CASE UPPER(SUB(pic,2,1))
+    OF 'D' OROF 'T'
+      lv = DEFORMAT(CLIP(LEFT(val)), pic)           ! LONG keeps CHANGE() exact
+      CHANGE(feq, lv)
     ELSE
       CHANGE(feq, CLIP(val))
     END
+  OF CREATE:button OROF CREATE:string OROF CREATE:sstring OROF CREATE:prompt
+    !- nothing to write back for these -
   ELSE
     CHANGE(feq, CLIP(val))
   END
@@ -449,41 +548,68 @@ i     SIGNED
 cnt   SIGNED
 feq   SIGNED
 val   STRING(4096)
+pic   STRING(64)
+lv    LONG
   CODE
+  IF ~SELF.PG THEN RETURN.
   cnt = SELF.RowCount()
-  SETTARGET(SELF.Win)
   LOOP i = 1 TO cnt
     feq = SELF.GetTag(i)
     IF ~feq THEN CYCLE.
+    val = ''
+    SETTARGET(SELF.Win)
     CASE feq{PROP:Type}
-    OF CREATE:check
-      val = CHOOSE(feq{PROP:Checked} = TRUE, '1', '0')
+    OF CREATE:check OROF CREATE:state3
+      val = CHOOSE(feq{PROP:Checked} = 1, '1', '0')
     OF CREATE:option
-      val = SELF.ControlLabel(feq{PROP:Child, CHOICE(feq)}, 0)
+      val = SELF.ChildLabelAt(feq, CHOICE(feq))
+    OF CREATE:button
+      val = ''
+    OF CREATE:string OROF CREATE:sstring OROF CREATE:prompt
+      val = feq{PROP:Text}
+    OF CREATE:entry OROF CREATE:spin OROF CREATE:singleline
+      pic = SELF.ControlPicture(feq)
+      CASE UPPER(SUB(pic,2,1))
+      OF 'D' OROF 'T'
+        lv  = CONTENTS(feq)
+        val = FORMAT(lv, pic)
+      ELSE
+        val = CONTENTS(feq)
+      END
     ELSE
       val = CONTENTS(feq)
     END
     SETTARGET()
-    SELF.SetValue(i, CLIP(val))
-    SETTARGET(SELF.Win)
+    SELF.SetValue(i, val)
   END
-  SETTARGET()
   SELF.Redraw()
 
+!---------------------------------------------------------------------
+! event pump
 !---------------------------------------------------------------------
 PropGridClass.TakeEvent PROCEDURE()
 row     SIGNED
 evt     SIGNED
 handled BYTE
+guard   SIGNED
   CODE
   IF ~SELF.PG THEN RETURN 0.
   handled = 0
-  LOOP WHILE PG_PollEvent(SELF.PG, row, evt)
+  guard   = 0
+  LOOP
+    guard += 1
+    IF guard > 2000 THEN BREAK.
+    row = 0
+    evt = 0
+    IF ~PG_PollEvent(SELF.PG, row, evt) THEN BREAK.
     handled = 1
     CASE evt
-    OF PGE:Changed  ; SELF.TakeChanged(row)
-    OF PGE:Button   ; SELF.TakeButton(row)
-    OF PGE:Select   ; SELF.TakeSelect(row)
+    OF PGE:Changed
+      SELF.TakeChanged(row)
+    OF PGE:Button
+      SELF.TakeButton(row)
+    OF PGE:Select OROF PGE:DblClick
+      SELF.TakeSelect(row)
     END
   END
   RETURN handled
@@ -500,7 +626,151 @@ feq SIGNED
 
 PropGridClass.TakeSelect PROCEDURE(SIGNED row)
   CODE
+  !- hook for derived classes -
 
 PropGridClass.Redraw PROCEDURE()
   CODE
   IF SELF.PG THEN PG_Redraw(SELF.PG).
+
+!---------------------------------------------------------------------
+! internals - every one of these assumes SETTARGET(SELF.Win) is active
+!---------------------------------------------------------------------
+PropGridClass.ControlLabel PROCEDURE(SIGNED feq, SIGNED prevLabelFeq)
+txt STRING(256)
+p   SIGNED
+  CODE
+  txt = ''
+  IF prevLabelFeq
+    txt = prevLabelFeq{PROP:Text}
+  END
+  IF txt = ''
+    CASE feq{PROP:Type}
+    OF CREATE:check OROF CREATE:state3 OROF CREATE:button OROF CREATE:radio |
+         OROF CREATE:option OROF CREATE:group OROF CREATE:prompt            |
+         OROF CREATE:string OROF CREATE:sstring
+      txt = feq{PROP:Text}                        ! a real caption, not a picture
+    END
+  END
+  LOOP                                            ! strip accelerator ampersands
+    p = INSTRING('&', txt, 1, 1)
+    IF ~p THEN BREAK.
+    txt = SUB(txt, 1, p - 1) & SUB(txt, p + 1, SIZE(txt) - p)
+  END
+  txt = LEFT(txt)
+  IF txt <> ''
+    IF SUB(CLIP(txt), LEN(CLIP(txt)), 1) = ':'
+      txt = SUB(CLIP(txt), 1, LEN(CLIP(txt)) - 1)
+    END
+  END
+  IF txt = '' THEN txt = 'Field ' & feq.
+  RETURN CLIP(txt)
+
+PropGridClass.ControlPicture PROCEDURE(SIGNED feq)
+t STRING(64)
+  CODE
+  t = feq{PROP:Text}                              ! ENTRY/SPIN: the picture, NO leading @
+  IF t = '' THEN RETURN ''.
+  IF SUB(t,1,1) = '@' THEN RETURN CLIP(t).
+  RETURN '@' & CLIP(t)
+
+PropGridClass.ChildLabels PROCEDURE(SIGNED optFeq)
+res STRING(4096)
+i   SIGNED
+n   SIGNED
+ch  SIGNED
+  CODE
+  res = ''
+  n   = 0
+  LOOP i = 1 TO 256
+    ch = optFeq{PROP:Child, i}
+    IF ~ch THEN BREAK.
+    IF ch{PROP:Type} = CREATE:radio
+      n += 1
+      IF n > 1
+        res = CLIP(res) & '|' & CLIP(SELF.ControlLabel(ch, 0))
+      ELSE
+        res = CLIP(SELF.ControlLabel(ch, 0))
+      END
+    END
+  END
+  RETURN CLIP(res)
+
+PropGridClass.ChildLabelAt PROCEDURE(SIGNED optFeq, SIGNED ordinal)
+i   SIGNED
+n   SIGNED
+ch  SIGNED
+  CODE
+  IF ordinal < 1 THEN RETURN ''.
+  n = 0
+  LOOP i = 1 TO 256
+    ch = optFeq{PROP:Child, i}
+    IF ~ch THEN BREAK.
+    IF ch{PROP:Type} = CREATE:radio
+      n += 1
+      IF n = ordinal THEN RETURN CLIP(SELF.ControlLabel(ch, 0)).
+    END
+  END
+  RETURN ''
+
+PropGridClass.ChildOrdinal PROCEDURE(SIGNED optFeq, STRING label)
+i   SIGNED
+n   SIGNED
+ch  SIGNED
+  CODE
+  n = 0
+  LOOP i = 1 TO 256
+    ch = optFeq{PROP:Child, i}
+    IF ~ch THEN BREAK.
+    IF ch{PROP:Type} = CREATE:radio
+      n += 1
+      IF UPPER(CLIP(SELF.ControlLabel(ch, 0))) = UPPER(CLIP(LEFT(label)))
+        RETURN n
+      END
+    END
+  END
+  RETURN 0
+
+PropGridClass.ListChoices PROCEDURE(SIGNED feq)
+res  STRING(4096)
+sTxt STRING(256)
+i    SIGNED
+n    SIGNED
+sOrd SIGNED
+  CODE
+  res = feq{PROP:From}                            ! only a string FROM() reads back
+  IF res <> '' THEN RETURN CLIP(res).
+  n = feq{PROP:Items}
+  IF n < 1 OR n > SELF.MaxScanItems THEN RETURN ''.
+  sOrd = CHOICE(feq)
+  sTxt = CONTENTS(feq)
+  LOOP i = 1 TO n
+    feq{PROP:Selected} = i
+    IF i > 1
+      res = CLIP(res) & '|' & CLIP(CONTENTS(feq))
+    ELSE
+      res = CLIP(CONTENTS(feq))
+    END
+  END
+  IF sOrd > 0
+    feq{PROP:Selected} = sOrd
+  ELSE
+    CHANGE(feq, CLIP(sTxt))
+  END
+  RETURN CLIP(res)
+
+PropGridClass.ListSelect PROCEDURE(SIGNED feq, STRING val)
+i    SIGNED
+n    SIGNED
+sOrd SIGNED
+  CODE
+  n = feq{PROP:Items}
+  IF n < 1 OR n > SELF.MaxScanItems THEN RETURN 0.
+  sOrd = CHOICE(feq)
+  LOOP i = 1 TO n
+    feq{PROP:Selected} = i
+    IF UPPER(CLIP(CONTENTS(feq))) = UPPER(CLIP(LEFT(val)))
+      RETURN 1
+    END
+  END
+  IF sOrd > 0 THEN feq{PROP:Selected} = sOrd.
+  RETURN 0

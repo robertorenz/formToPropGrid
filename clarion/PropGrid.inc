@@ -1,7 +1,15 @@
-!ABCIncludeFile
+!ABCIncludeFile(PROPGRID)
 !=====================================================================
 ! PropGrid.inc - Clarion wrapper class for PROPGRID.DLL
 !                (ClaPropGrid: Direct2D property grid)
+!
+! Multi-DLL:  where this class's CODE lives is decided by the two
+!             project defines _PropGridLinkMode_ / _PropGridDllMode_,
+!             which the ClaPropGrid templates generate through the ABC
+!             class category 'PROPGRID'.  With neither define present
+!             (a hand-coded project) LINK behaves as 1 and DLL as 0,
+!             which is exactly the single-EXE behaviour.  Never EQUATE
+!             them here - they must arrive as project defines.
 !=====================================================================
   OMIT('_EndOfInclude_',_PropGridPresent_)
 _PropGridPresent_  EQUATE(1)
@@ -17,9 +25,9 @@ PGT:Spin        EQUATE(7)
 PGT:Button      EQUATE(8)
 PGT:Color       EQUATE(9)
 PGT:Date        EQUATE(10)
+PGT:ReadOnly    EQUATE(11)
 PGT:Time        EQUATE(12)
 PGT:MultiText   EQUATE(13)
-PGT:ReadOnly    EQUATE(11)
 
 !---- event types ----------------------------------------------------
 PGE:Changed     EQUATE(1)
@@ -52,21 +60,37 @@ PGC:SelText     EQUATE(9)
 PGC:DescBack    EQUATE(10)
 PGC:DescText    EQUATE(11)
 
+!---- placement / docking modes (Reposition uses these) --------------
+PGD:Region      EQUATE(0)   ! track the REGION control in RegionFeq
+PGD:Fill        EQUATE(1)   ! fill the whole window client area
+PGD:Left        EQUATE(2)   ! dock to the left edge, DockSize wide
+PGD:Right       EQUATE(3)   ! dock to the right edge, DockSize wide
+PGD:Fixed       EQUATE(4)   ! do not move on resize
+
 PropGridClass CLASS,TYPE,MODULE('PropGrid.clw'),LINK('PropGrid.clw',_PropGridLinkMode_),DLL(_PropGridDllMode_)
 PG              LONG                          ! HPG handle (0 = dead)
 Win             &WINDOW                       ! owning Clarion window
 RegionFeq       SIGNED                        ! placeholder region (0 = fixed x/y)
+DockMode        BYTE                          ! PGD:xxx - drives Reposition()
+DockSize        SIGNED                        ! px width for PGD:Left / PGD:Right
+MarginX         SIGNED                        ! px inset, left+right
+MarginY         SIGNED                        ! px inset, top+bottom
+Style           ULONG                         ! style passed to PG_Create
 LiveSync        BYTE                          ! 1 = push edits to USE vars at once
 HideOriginals   BYTE                          ! BuildFromWindow hides source ctrls
 Initialized     BYTE
-NextPrompt      SIGNED                        ! prompt feq feeding the next AddControl label
+TimerInterval   SIGNED                        ! forced on the window (0 = leave alone)
+MaxScanItems    SIGNED                        ! cap when enumerating a queue DROP
+NextPrompt      SIGNED                        ! label feq feeding the next AddControl
 Construct       PROCEDURE()
 Destruct        PROCEDURE()
 !-- lifetime --
 Init            PROCEDURE(WINDOW W, SIGNED regionFeq, ULONG style=3),BYTE,PROC,VIRTUAL
 InitXY          PROCEDURE(WINDOW W, SIGNED x, SIGNED y, SIGNED width, SIGNED height, ULONG style=3),BYTE,PROC,VIRTUAL
 Kill            PROCEDURE(),VIRTUAL
-Reposition      PROCEDURE()                   ! re-track region after resize
+SetDock         PROCEDURE(BYTE mode, SIGNED size=0, SIGNED marginX=0, SIGNED marginY=0)
+SetPos          PROCEDURE(SIGNED x, SIGNED y, SIGNED width, SIGNED height)
+Reposition      PROCEDURE(),VIRTUAL           ! re-track region / dock after resize
 !-- appearance --
 SetFont         PROCEDURE(SHORT part, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)
 SetColor        PROCEDURE(SHORT slot, LONG color)
@@ -96,13 +120,19 @@ SyncBack        PROCEDURE()                   ! all grid values -> USE vars
 SyncRow         PROCEDURE(SIGNED row)         ! one grid value  -> USE var
 SyncFrom        PROCEDURE()                   ! USE vars -> grid values
 !-- event pump --
-TakeEvent       PROCEDURE(),BYTE,PROC,VIRTUAL ! call from ACCEPT loop
+TakeEvent       PROCEDURE(),BYTE,PROC,VIRTUAL ! call from the ACCEPT loop / timer
 TakeChanged     PROCEDURE(SIGNED row),VIRTUAL
 TakeButton      PROCEDURE(SIGNED row),VIRTUAL
 TakeSelect      PROCEDURE(SIGNED row),VIRTUAL
 Redraw          PROCEDURE()
-!-- internals --
-ControlLabel    PROCEDURE(SIGNED feq, SIGNED prevPromptFeq),STRING,PRIVATE
+!-- internals (all assume SETTARGET(SELF.Win) is active) --
+ControlLabel    PROCEDURE(SIGNED feq, SIGNED prevLabelFeq),STRING,PRIVATE
+ControlPicture  PROCEDURE(SIGNED feq),STRING,PRIVATE
+ChildLabels     PROCEDURE(SIGNED optFeq),STRING,PRIVATE
+ChildLabelAt    PROCEDURE(SIGNED optFeq, SIGNED ordinal),STRING,PRIVATE
+ChildOrdinal    PROCEDURE(SIGNED optFeq, STRING label),SIGNED,PRIVATE
+ListChoices     PROCEDURE(SIGNED feq),STRING,PRIVATE
+ListSelect      PROCEDURE(SIGNED feq, STRING val),BYTE,PROC,PRIVATE
               END
 
   _EndOfInclude_

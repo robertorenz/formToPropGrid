@@ -1,16 +1,22 @@
 # ClaPropGrid — Direct2D Property Grid for Clarion
 
-A fast, modern property grid for Clarion 12 applications, rendered with
-Direct2D/DirectWrite by a native C DLL, and integrated into the Clarion
-AppGen through two templates:
+A fast, modern property grid for Clarion applications (9 through 12),
+rendered with Direct2D/DirectWrite by a native C DLL, and integrated into
+the Clarion AppGen through the `ClaPropGrid` template chain (ABC):
 
-1. **Property Grid control template** — drop a property grid on any window and
-   feed it fields (table columns or any variables) picked in the template UI.
-2. **Form-to-PropertyGrid extension template** — point it at an existing form
-   procedure: at runtime it discovers every input control on the window,
-   hides the originals, rebuilds them as rows of a property grid, and syncs
-   values back on OK (or live). The form's own OK/Cancel logic keeps working —
-   grid button rows simply POST `EVENT:Accepted` to the original buttons.
+1. **PropGridGlobal** (application extension) — one-time global wiring:
+   class include, `propgrid.lib` link, multi-DLL link/dll pragmas via ABC
+   class category `PROPGRID`.
+2. **PropertyGridControl** (control template, multi-instance) — drop a
+   property grid on any window and feed it fields (table columns or any
+   variables) picked in the template UI, with per-field editor type,
+   choices, ranges, categories and descriptions.
+3. **FormToPropertyGrid** (procedure extension) — point it at an existing
+   form: at runtime it discovers every input control on the window, hides
+   the originals, rebuilds them as rows of a property grid, and syncs
+   values back on OK (or live). The form's own OK/Cancel logic keeps
+   working — grid button rows simply POST `EVENT:Accepted` to the original
+   buttons. Placement is dockable (fill/left/right) or region-tracked.
 
 ![screenshot](docs/screenshot.png)
 
@@ -36,9 +42,9 @@ AppGen through two templates:
 
 | Path | Contents |
 |------|----------|
-| `src/` | `propgrid.cpp/.h/.def` — the Direct2D engine; `testhost.c` — standalone visual test; `build.bat` |
+| `src/` | `propgrid.cpp/.h/.def` — the Direct2D engine; `testhost.c` — standalone visual test; `build.bat`; `make-clarion-lib.ps1` — generates the Clarion import lib (no LibMaker needed) |
 | `bin/` | `propgrid.dll` (32-bit), `testhost.exe`, MSVC import lib |
-| `clarion/` | `PropGrid.inc/.clw` — wrapper class; `ClaPropGrid.tpl` — the two templates; `INSTALL.md` |
+| `clarion/` | `PropGrid.inc/.clw` — wrapper class (source, compiles in any Clarion version); `ClaPropGrid.tpl/.tpw` — the template chain; `propgrid.lib` — pre-built Clarion import lib (works in Clarion 9–12); `INSTALL.md` |
 
 The engine is C-style code compiled as C++ purely because the D2D/DWrite COM
 headers are far cleaner that way; the exported surface is a flat C API,
@@ -48,14 +54,18 @@ headers are far cleaner that way; the exported surface is a flat C API,
 ## Building the DLL
 
 Run `src\build.bat` (needs Visual Studio 2022). It produces a **32-bit**
-`bin\propgrid.dll` (Clarion apps are 32-bit) plus `testhost.exe`, a plain
-Win32 program that exercises every editor type — run it to see the grid
-without involving Clarion at all.
+`bin\propgrid.dll` (Clarion apps are 32-bit), `testhost.exe` — a plain
+Win32 program that exercises every editor type without involving Clarion —
+and `clarion\propgrid.lib`, the Clarion import library, generated directly
+from `propgrid.def` (export ordinals are pinned there as a contract; never
+renumber them). The DLL statically links the CRT, so the only runtime
+dependencies are stock Windows DLLs — compatible with Windows 7 SP1
+through Windows 11, no VC++ redistributable required.
 
 ## Using from Clarion
 
-See `clarion/INSTALL.md` for template registration, LibMaker import-library
-generation, and deployment. In short:
+See `clarion/INSTALL.md` for installation, template registration
+(`ClarionCL -tr`), verified runtime notes, and deployment. In short:
 
 ```clarion
 PG  PropGridClass

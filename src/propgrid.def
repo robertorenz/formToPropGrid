@@ -1,31 +1,34 @@
 LIBRARY PROPGRID
+; Ordinals are a public contract: the Clarion import library
+; (clarion\propgrid.lib) references them, so NEVER renumber or reuse
+; an ordinal.  New exports get the next free number, appended below.
 EXPORTS
-    PG_Initialize
-    PG_Shutdown
-    PG_Create
-    PG_Destroy
-    PG_SetPos
-    PG_GetHwnd
-    PG_SetFont
-    PG_SetColor
-    PG_SetRowHeight
-    PG_SetSplitter
-    PG_GetSplitter
-    PG_Clear
-    PG_AddCategory
-    PG_AddProperty
-    PG_SetChoices
-    PG_SetRange
-    PG_SetDescription
-    PG_SetReadOnly
-    PG_SetExpanded
-    PG_SetTag
-    PG_GetTag
-    PG_SetValue
-    PG_GetValue
-    PG_GetRowCount
-    PG_FindRow
-    PG_GetSelected
-    PG_PollEvent
-    PG_SetCallback
-    PG_Redraw
+    PG_Initialize      @1
+    PG_Shutdown        @2
+    PG_Create          @3
+    PG_Destroy         @4
+    PG_SetPos          @5
+    PG_GetHwnd         @6
+    PG_SetFont         @7
+    PG_SetColor        @8
+    PG_SetRowHeight    @9
+    PG_SetSplitter     @10
+    PG_GetSplitter     @11
+    PG_Clear           @12
+    PG_AddCategory     @13
+    PG_AddProperty     @14
+    PG_SetChoices      @15
+    PG_SetRange        @16
+    PG_SetDescription  @17
+    PG_SetReadOnly     @18
+    PG_SetExpanded     @19
+    PG_SetTag          @20
+    PG_GetTag          @21
+    PG_SetValue        @22
+    PG_GetValue        @23
+    PG_GetRowCount     @24
+    PG_FindRow         @25
+    PG_GetSelected     @26
+    PG_PollEvent       @27
+    PG_SetCallback     @28
+    PG_Redraw          @29
