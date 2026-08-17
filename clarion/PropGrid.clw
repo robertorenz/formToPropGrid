@@ -98,6 +98,7 @@ PropGridClass.Construct PROCEDURE()
   SELF.TabCategories = 0
   SELF.Lookups      &= NEW(PropGridLookupQueue)
   SELF.Tabs         &= NEW(PropGridTabQueue)
+  SELF.CatNames     &= NEW(PropGridCatQueue)
 
 PropGridClass.Destruct PROCEDURE()
   CODE
@@ -115,6 +116,11 @@ PropGridClass.Destruct PROCEDURE()
     FREE(SELF.Tabs)
     DISPOSE(SELF.Tabs)
     SELF.Tabs &= NULL
+  END
+  IF ~SELF.CatNames &= NULL
+    FREE(SELF.CatNames)
+    DISPOSE(SELF.CatNames)
+    SELF.CatNames &= NULL
   END
 
 !---------------------------------------------------------------------
@@ -160,10 +166,19 @@ PropGridClass.InitXY PROCEDURE(WINDOW W, SIGNED x, SIGNED y, SIGNED width, SIGNE
   RETURN 1
 
 PropGridClass.Kill PROCEDURE()
+i SIGNED
   CODE
   IF SELF.PG
     PG_Destroy(SELF.PG)
     SELF.PG = 0
+  END
+  IF ~SELF.CatNames &= NULL THEN FREE(SELF.CatNames).  ! the headers died with the grid
+  IF ~SELF.Tabs &= NULL                                ! ditto the per-tab category ids
+    LOOP i = 1 TO RECORDS(SELF.Tabs)
+      GET(SELF.Tabs, i)
+      SELF.Tabs.CatId = 0
+      PUT(SELF.Tabs)
+    END
   END
   SELF.Initialized     = 0
   SELF.PendingSyncFrom = 0
@@ -267,15 +282,31 @@ i SIGNED
       PUT(SELF.Tabs)
     END
   END
+  IF ~SELF.CatNames &= NULL THEN FREE(SELF.CatNames). ! the headers are going too
   SELF.PendingSyncFrom = 0
   IF SELF.PG THEN PG_Clear(SELF.PG).
 
 PropGridClass.AddCategory PROCEDURE(STRING catName)
 cName CSTRING(256)
+i     SIGNED
+id    SIGNED
   CODE
   IF ~SELF.PG THEN RETURN 0.
-  cName = CLIP(catName)
-  RETURN PG_AddCategory(SELF.PG, cName)
+  LOOP i = 1 TO RECORDS(SELF.CatNames)             ! same name = same header,
+    GET(SELF.CatNames, i)                          ! whoever asks (default cat,
+    IF UPPER(CLIP(SELF.CatNames.Name)) = UPPER(CLIP(LEFT(catName))) ! a tab, a lookup,
+      RETURN SELF.CatNames.Id                      ! an added row, hand code)
+    END
+  END
+  cName = CLIP(LEFT(catName))
+  id = PG_AddCategory(SELF.PG, cName)
+  IF id
+    CLEAR(SELF.CatNames)
+    SELF.CatNames.Name = CLIP(LEFT(catName))
+    SELF.CatNames.Id   = id
+    ADD(SELF.CatNames)
+  END
+  RETURN id
 
 !---------------------------------------------------------------------
 ! SetTabCategory - rename the category a TAB's controls will land in.

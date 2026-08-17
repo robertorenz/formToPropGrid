@@ -103,6 +103,15 @@ CatName             STRING(64)              ! '' = the TAB's own text
 CatId               SIGNED                  ! 0 = not created yet
                   END
 
+!---- category name registry (see PropGridClass.AddCategory) ----------
+! AddCategory merges by name: asking twice for 'General' returns the
+! SAME header, whichever source asked (default category, a tab, a
+! lookup row, an added row, hand code).
+PropGridCatQueue  QUEUE,TYPE
+Name                STRING(64)
+Id                  SIGNED
+                  END
+
 PropGridClass CLASS,TYPE,MODULE('PropGrid.clw'),LINK('PropGrid.clw',_PropGridLinkMode_),DLL(_PropGridDllMode_)
 PG              LONG                          ! HPG handle (0 = dead)
 Win             &WINDOW                       ! owning Clarion window
@@ -122,6 +131,7 @@ PendingSyncFrom BYTE                          ! >0 = SyncFrom() in N more TakeEv
 TabCategories   BYTE                          ! 1 = each TAB's text becomes a category
 Lookups         &PropGridLookupQueue,PRIVATE  ! AddFileDrop registry (NEW in Construct)
 Tabs            &PropGridTabQueue,PRIVATE     ! per-tab registry    (NEW in Construct)
+CatNames        &PropGridCatQueue,PRIVATE     ! category merge-by-name registry
 Construct       PROCEDURE()
 Destruct        PROCEDURE()
 !-- lifetime --
