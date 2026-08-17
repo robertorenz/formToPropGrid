@@ -194,6 +194,29 @@ the description** and writes the **code** back:
 | *File* / *Order by key* / *Code field* / *Description field* | the lookup table and its two columns |
 | *Label* / *Category* / *Description* | blank label = the PROMPT in front of the code control; blank category = the default one |
 
+**You do not have to fill that list in by hand.** The *Find them for me* box has a
+**Scan this window for lookups** button that reads what ABC already knows about the window:
+
+| What it needs | Where it comes from | Certainty |
+|---|---|---|
+| the code ENTRY | any ENTRY/SPIN whose *Lookup Key* is set — ABC's own pre-edit or post-edit lookup prompts (`ABWINDOW.TPW:2058-2067`), which are children of `%Control` | exact |
+| the lookup FILE and the code field | `#FIND(%Key,<that key>)` fixes `%File` too (the trick `ABWINDOW.TPW:2096` uses); the key's component field **is** the code field | exact |
+| the `'...'` BUTTON | a `FieldLookupButton` instance pointing at this ENTRY (`%ControlToLookup`, `ABCONTRL.TPW:241`), or a button whose name contains `LOOKUP` | proven, or left blank |
+| the description STRING | the first STRING/PROMPT after the ENTRY that has a **USE variable** (not a caption) | guess |
+| the description field | that variable when it is a field of the lookup file, else the file's first STRING/CSTRING/PSTRING field that is not the code field | guess |
+
+The trio ends at the next data control (ENTRY/SPIN/LIST/COMBO/CHECK/OPTION/TEXT/SHEET/TAB),
+so a lookup never swallows the control after it. Results are **appended**; an entry whose code
+control is already listed is skipped, so re-scanning after you change the window is safe. The
+*Last scan* line reports `added N, already listed N, unconfigured buttons N` — that last count
+is the buttons that are not part of a detected trio, i.e. your hand-coded lookups, which you
+still add by hand.
+
+> **A button is only paired when it proves it is the lookup**, because the generated code
+> `HIDE`s it — pairing "the next button on the window" would hide something like `?Btn_Save`.
+> When nothing qualifies the entry is still converted, the *Lookup button* prompt stays blank,
+> and your browse button stays visible and keeps working.
+
 Generated per entry (instance `n`, entry `i`), right after `BuildFromWindow`:
 
 ```
@@ -402,3 +425,6 @@ the Added-rows code does for the row label. **If generated code disappears entir
 | The grid still shows the old code after a `'...'` browse | the window has no timer: `PendingSyncFrom` is counted down inside `TakeEvent`, which only runs on `EVENT:Timer` |
 | An added row shows the right value but never writes it back | *Live sync* off and no OK button resolved — nothing calls `PGFSave:`; or the row is marked *Read only* / uses the `Read only` or `Button` editor |
 | An added row shows a number as `1234.56000000` or a date as `82907` | the editor type is `Text` — pick `Date` / `Time` (and a picture) so the row is FORMATted |
+| *Scan this window for lookups* finds nothing | the ENTRYs have no *Lookup Key* set — the lookup is hand-coded in an embed, which cannot be detected; add those entries by hand (the *unconfigured buttons* count tells you how many candidates were skipped) |
+| The scan found the trio but left *Lookup button* blank | no button proved itself (no `FieldLookupButton` extension, no `LOOKUP` in the name) — pick it in the entry, or leave it: the button simply stays visible |
+| The scan filled in the wrong *Description field* | that one is a guess — correct it in the entry; a re-scan will not overwrite it |

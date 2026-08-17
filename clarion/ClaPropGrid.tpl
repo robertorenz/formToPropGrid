@@ -355,6 +355,24 @@ PGSave:%PGObject ROUTINE
       #DISPLAY('with thousands of records.  The scan stops at the object''s')
       #DISPLAY('MaxScanItems (500 by default); leave the browse button alone for')
       #DISPLAY('anything bigger.')
+    #ENDBOXED
+    #BOXED('Find them for me')
+      #DISPLAY('Scan the window for the standard Clarion lookup: an ENTRY whose')
+      #DISPLAY('"Lookup Key" / "Lookup Field" prompts are filled in (Actions tab')
+      #DISPLAY('of the entry, pre- or post-edit), the "..." BUTTON that follows')
+      #DISPLAY('it, and the STRING that shows the description.  The file and the')
+      #DISPLAY('code field come from the lookup KEY, so they are exact; the')
+      #DISPLAY('description field is a GUESS - check it.')
+      #DISPLAY('')
+      #DISPLAY('Everything found is APPENDED to the list below; a trio already')
+      #DISPLAY('listed is never added twice, so re-scanning after you change the')
+      #DISPLAY('window is safe.  Delete anything you do not want converted.')
+      #BUTTON('&Scan this window for lookups'),WHENACCEPTED(%PGScanLookups())
+      #ENDBUTTON
+      #PROMPT('Last scan:',@s64),%F2PScanInfo
+      #DISPLAY('Hand-coded lookups (your own browse call in an embed) cannot be')
+      #DISPLAY('detected - the scan counts them as "unconfigured" and you add')
+      #DISPLAY('those by hand below.')
       #BUTTON('Lookup &drop-downs...'),MULTI(%F2PLookup,%F2PLookupCode & ' -> ' & %F2PLookupFile & '.' & %F2PLookupDescFld),INLINE
         #BOXED('The three controls on THIS window')
           #PROMPT('&Code control (the ENTRY holding the code):',CONTROL),%F2PLookupCode,REQ
@@ -854,6 +872,182 @@ PGFSave:%F2PObject ROUTINE
   #EMBED(%F2PAfterSave,'ClaPropGrid (form): after saving the added rows into the variables'),%ActiveTemplateInstance
   #ENDIF
 #ENDAT
+#!=============================================================================
+#!  %PGScanLookups - fill the Lookups list from what is already on the window.
+#!
+#!  Runs at PROMPT time, from the "Scan this window for lookups" button
+#!  (#BUTTON(...),WHENACCEPTED(...) with an empty body is the shipped idiom
+#!  for an action button - ABCONTRL.TPW:36).  It lives in the .tpl, not the
+#!  .tpw, because a #GROUP in the included file that reads THIS template's
+#!  symbols has been measured to come back empty.
+#!
+#!  What it reads (all of it put there by ABC itself):
+#!    %PostLookupKey / %PostLookupField  - the ENTRY's own "when accepted"
+#!    %PreLookupKey  / %PreLookupField   - ... or "when selected" lookup,
+#!        declared per control in ABWINDOW.TPW:2058-2067 (they are children
+#!        of the %Control list, so #FOR(%Control) fixes them).
+#!    #FIND(%Key,<that key>) fixes %File as well - ABWINDOW.TPW:2096 relies
+#!        on exactly that - which gives the lookup FILE, and the key's
+#!        component field IS the code field.
+#!
+#!  What it guesses: the description control (the first STRING/PROMPT after
+#!  the trio's ENTRY that has a USE VARIABLE) and, from it, the description
+#!  field (that variable when it belongs to the lookup file, otherwise the
+#!  file's first string field that is not the code field).
+#!
+#!  #ADD(list,ITEMS(list)+1) + #SET(child,...) is the population idiom from
+#!  ABCONTRL.TPW:222-227; PRESERVE keeps the caller's %Control / %File /
+#!  %Key fixes intact.
+#!=============================================================================
+#GROUP(%PGScanLookups),PRESERVE,AUTO
+#DECLARE(%pgHit),MULTI
+#DECLARE(%pgHitCode,%pgHit)
+#DECLARE(%pgHitBtn,%pgHit)
+#DECLARE(%pgHitDesc,%pgHit)
+#DECLARE(%pgHitFile,%pgHit)
+#DECLARE(%pgHitCodeFld,%pgHit)
+#DECLARE(%pgHitDescFld,%pgHit)
+#DECLARE(%pgOpen)
+#DECLARE(%pgIsBtn)
+#DECLARE(%pgKey)
+#DECLARE(%pgFld)
+#DECLARE(%pgUse)
+#DECLARE(%pgSeen)
+#DECLARE(%pgAdded)
+#DECLARE(%pgSkipped)
+#DECLARE(%pgLoose)
+#FREE(%pgHit)
+#SET(%pgOpen,0)
+#SET(%pgAdded,0)
+#SET(%pgSkipped,0)
+#SET(%pgLoose,0)
+#!---- pass 1: walk the window in declaration order ---------------------------
+#FOR(%Control)
+  #CASE(%ControlType)
+  #OF('ENTRY')
+  #OROF('SPIN')
+    #SET(%pgKey,'')
+    #SET(%pgFld,'')
+    #IF(VAREXISTS(%PostLookupKey))
+      #IF(%PostLookupKey)
+        #SET(%pgKey,%PostLookupKey)
+        #SET(%pgFld,%PostLookupField)
+      #ENDIF
+    #ENDIF
+    #IF(%pgKey = '' AND VAREXISTS(%PreLookupKey))
+      #IF(%PreLookupKey)
+        #SET(%pgKey,%PreLookupKey)
+        #SET(%pgFld,%PreLookupField)
+      #ENDIF
+    #ENDIF
+    #IF(%pgKey)
+      #ADD(%pgHit,ITEMS(%pgHit) + 1)                #! the new entry is now current
+      #SET(%pgHitCode,%Control)
+      #SET(%pgHitBtn,'')
+      #SET(%pgHitDesc,'')
+      #SET(%pgHitDescFld,'')
+      #SET(%pgHitCodeFld,%pgFld)
+      #SET(%pgHitFile,'')
+      #FIND(%Key,%pgKey)                            #! fixes %File too
+      #SET(%pgHitFile,%File)
+      #SET(%pgOpen,1)
+    #ELSE
+      #SET(%pgOpen,0)                               #! a plain ENTRY closes the trio
+    #ENDIF
+  #OF('BUTTON')
+    #IF(%pgOpen)
+      #!  Only a button that PROVES it is the lookup is taken, because the
+      #!  generated code HIDEs it - pairing "the next button on the window"
+      #!  would hide something like ?Btn_Save.  Proof is either ABC's own
+      #!  FieldLookupButton (it stores the ENTRY it serves in
+      #!  %ControlToLookup - ABCONTRL.TPW:241) or a name that says so.
+      #!  Nothing proven = no button on the entry, and the real one simply
+      #!  stays visible and keeps working.
+      #SET(%pgIsBtn,0)
+      #IF(VAREXISTS(%ControlToLookup))
+        #IF(%ControlToLookup)
+          #IF(UPPER(%ControlToLookup) = UPPER(%pgHitCode))
+            #SET(%pgIsBtn,1)
+          #ENDIF
+        #ENDIF
+      #ENDIF
+      #IF(%pgIsBtn = 0 AND INSTRING('LOOKUP',UPPER(%Control),1,1))
+        #SET(%pgIsBtn,1)
+      #ENDIF
+      #IF(%pgIsBtn AND %pgHitBtn = '')
+        #SET(%pgHitBtn,%Control)
+      #ENDIF
+    #ELSE
+      #SET(%pgLoose,%pgLoose + 1)                   #! a button with no configured lookup
+    #ENDIF
+  #OF('STRING')
+  #OROF('PROMPT')
+    #IF(%pgOpen)
+      #IF(%pgHitDesc = '' AND %ControlUse)
+        #IF(SUB(%ControlUse,1,1) <> '?')            #! a caption, not a USE variable
+          #SET(%pgHitDesc,%Control)
+        #ENDIF
+      #ENDIF
+    #ENDIF
+  #OF('LIST')
+  #OROF('COMBO')
+  #OROF('CHECK')
+  #OROF('OPTION')
+  #OROF('TEXT')
+  #OROF('SHEET')
+  #OROF('TAB')
+    #SET(%pgOpen,0)                                 #! the next data control ends the trio
+  #ENDCASE
+#ENDFOR
+#!---- pass 2: resolve the description field, then append ---------------------
+#SET(%pgSeen,'')
+#FOR(%F2PLookup)
+  #SET(%pgSeen,%pgSeen & '|' & UPPER(%F2PLookupCode) & '|')
+#ENDFOR
+#FOR(%pgHit)
+  #SET(%pgUse,'')
+  #IF(%pgHitDesc)
+    #FIX(%Control,%pgHitDesc)
+    #SET(%pgUse,%ControlUse)
+  #ENDIF
+  #IF(%pgHitFile)
+    #FIX(%File,%pgHitFile)
+    #IF(%pgUse)
+      #FOR(%Field),WHERE(UPPER(%Field) = UPPER(%pgUse))
+        #SET(%pgHitDescFld,%Field)                  #! the STRING shows a field of the file
+        #BREAK
+      #ENDFOR
+    #ENDIF
+    #IF(%pgHitDescFld = '')
+      #FOR(%Field),WHERE(%FieldType = 'STRING' OR %FieldType = 'CSTRING' OR %FieldType = 'PSTRING')
+        #IF(UPPER(%Field) <> UPPER(%pgHitCodeFld))
+          #SET(%pgHitDescFld,%Field)                #! first text field that is not the code
+          #BREAK
+        #ENDIF
+      #ENDFOR
+    #ENDIF
+    #IF(%pgHitDescFld = '')
+      #SET(%pgHitDescFld,%pgHitCodeFld)             #! a one column table - show the code
+    #ENDIF
+  #ENDIF
+  #IF(INSTRING('|' & UPPER(%pgHitCode) & '|',%pgSeen,1,1))
+    #SET(%pgSkipped,%pgSkipped + 1)                 #! already in the list - leave it alone
+  #ELSE
+    #ADD(%F2PLookup,ITEMS(%F2PLookup) + 1)
+    #SET(%F2PLookupCode,%pgHitCode)
+    #SET(%F2PLookupBtn,%pgHitBtn)
+    #SET(%F2PLookupDesc,%pgHitDesc)
+    #SET(%F2PLookupFile,%pgHitFile)
+    #SET(%F2PLookupKey,'')
+    #SET(%F2PLookupCodeFld,%pgHitCodeFld)
+    #SET(%F2PLookupDescFld,%pgHitDescFld)
+    #SET(%F2PLookupLabel,'')
+    #SET(%F2PLookupCat,'')
+    #SET(%F2PLookupTip,'')
+    #SET(%pgAdded,%pgAdded + 1)
+  #ENDIF
+#ENDFOR
+#SET(%F2PScanInfo,'added ' & %pgAdded & ', already listed ' & %pgSkipped & ', unconfigured buttons ' & %pgLoose)
 #!=============================================================================
 #!  Shared #GROUPs.  A #GROUP has no end marker and swallows everything after
 #!  it, so every #AT / #EMBED above must come FIRST - hence the include here,

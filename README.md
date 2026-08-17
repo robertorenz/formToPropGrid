@@ -20,7 +20,9 @@ the Clarion AppGen through the `ClaPropGrid` template chain (ABC):
    Its **Lookups** tab folds the classic lookup trio — code `ENTRY` +
    `'...'` **BUTTON** + description `STRING` — into **one drop-down row
    that shows the description and writes the code back**, filled from the
-   lookup table at window-open time. Lookups you leave as buttons still
+   lookup table at window-open time; a **Scan this window for lookups**
+   button finds those trios for you, reading the file and code field
+   straight out of the ENTRY's own ABC *Lookup Key* settings. Lookups you leave as buttons still
    work, and the grid now refreshes itself after the browse closes. Its
    **Added rows** tab adds rows for variables or table columns that have
    **no control on the window at all** (same field list as the control
