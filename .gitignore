@@ -1,0 +1,4 @@
+*.obj
+*.exp
+src/*.pdb
+
