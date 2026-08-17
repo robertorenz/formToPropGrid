@@ -902,26 +902,33 @@ PGFSave:%F2PObject ROUTINE
 #GROUP(%PGScanLookups),PRESERVE,AUTO
 #DECLARE(%pgHit),MULTI
 #DECLARE(%pgHitCode,%pgHit)
+#DECLARE(%pgHitCodeUse,%pgHit)
 #DECLARE(%pgHitBtn,%pgHit)
 #DECLARE(%pgHitDesc,%pgHit)
 #DECLARE(%pgHitFile,%pgHit)
 #DECLARE(%pgHitCodeFld,%pgHit)
 #DECLARE(%pgHitDescFld,%pgHit)
+#DECLARE(%pgHitDrop,%pgHit)
 #DECLARE(%pgOpen)
 #DECLARE(%pgIsBtn)
 #DECLARE(%pgKey)
 #DECLARE(%pgFld)
+#DECLARE(%pgTxt)
 #DECLARE(%pgUse)
+#DECLARE(%pgCodeFile)
 #DECLARE(%pgSeen)
 #DECLARE(%pgAdded)
 #DECLARE(%pgSkipped)
-#DECLARE(%pgLoose)
+#DECLARE(%pgUnres)
 #FREE(%pgHit)
 #SET(%pgOpen,0)
 #SET(%pgAdded,0)
 #SET(%pgSkipped,0)
-#SET(%pgLoose,0)
+#SET(%pgUnres,0)
 #!---- pass 1: walk the window in declaration order ---------------------------
+#!  EVERY entry opens a candidate, because a hand-wired lookup (no Lookup Key
+#!  set, just an ALRT / DROPID and a browse call in an embed) is identified
+#!  later, in pass 2, from the description STRING's own field.
 #FOR(%Control)
   #CASE(%ControlType)
   #OF('ENTRY')
@@ -940,20 +947,26 @@ PGFSave:%F2PObject ROUTINE
         #SET(%pgFld,%PreLookupField)
       #ENDIF
     #ENDIF
+    #ADD(%pgHit,ITEMS(%pgHit) + 1)                  #! the new entry is now current
+    #SET(%pgHitCode,%Control)
+    #SET(%pgHitCodeUse,%ControlUse)
+    #SET(%pgHitBtn,'')
+    #SET(%pgHitDesc,'')
+    #SET(%pgHitDescFld,'')
+    #SET(%pgHitCodeFld,%pgFld)
+    #SET(%pgHitFile,'')
+    #!  DROPID('Majors') on the entry names the file in a drag-and-drop
+    #!  lookup - a third chance at the table, checked against the dictionary.
+    #SET(%pgTxt,EXTRACT(%ControlStatement,'DROPID',1))
+    #IF(SUB(%pgTxt,1,1) = '<39>')
+      #SET(%pgTxt,SUB(%pgTxt,2,LEN(%pgTxt) - 2))
+    #ENDIF
+    #SET(%pgHitDrop,%pgTxt)
     #IF(%pgKey)
-      #ADD(%pgHit,ITEMS(%pgHit) + 1)                #! the new entry is now current
-      #SET(%pgHitCode,%Control)
-      #SET(%pgHitBtn,'')
-      #SET(%pgHitDesc,'')
-      #SET(%pgHitDescFld,'')
-      #SET(%pgHitCodeFld,%pgFld)
-      #SET(%pgHitFile,'')
       #FIND(%Key,%pgKey)                            #! fixes %File too
       #SET(%pgHitFile,%File)
-      #SET(%pgOpen,1)
-    #ELSE
-      #SET(%pgOpen,0)                               #! a plain ENTRY closes the trio
     #ENDIF
+    #SET(%pgOpen,1)
   #OF('BUTTON')
     #IF(%pgOpen)
       #!  Only a button that PROVES it is the lookup is taken, because the
@@ -974,11 +987,21 @@ PGFSave:%F2PObject ROUTINE
       #IF(%pgIsBtn = 0 AND INSTRING('LOOKUP',UPPER(%Control),1,1))
         #SET(%pgIsBtn,1)
       #ENDIF
+      #!  the real signature of a lookup button is its CAPTION.  EXTRACT gives
+      #!  it back quoted, so strip the quotes the way ABBROWSE.TPW:2759 does.
+      #!  '...' exactly - never 'Save...' - because the generated code HIDEs it.
+      #IF(%pgIsBtn = 0)
+        #SET(%pgTxt,EXTRACT(%ControlStatement,'BUTTON',1))
+        #IF(SUB(%pgTxt,1,1) = '<39>')
+          #SET(%pgTxt,SUB(%pgTxt,2,LEN(%pgTxt) - 2))
+        #ENDIF
+        #IF(%pgTxt = '...')
+          #SET(%pgIsBtn,1)
+        #ENDIF
+      #ENDIF
       #IF(%pgIsBtn AND %pgHitBtn = '')
         #SET(%pgHitBtn,%Control)
       #ENDIF
-    #ELSE
-      #SET(%pgLoose,%pgLoose + 1)                   #! a button with no configured lookup
     #ENDIF
   #OF('STRING')
   #OROF('PROMPT')
@@ -1010,6 +1033,74 @@ PGFSave:%F2PObject ROUTINE
     #FIX(%Control,%pgHitDesc)
     #SET(%pgUse,%ControlUse)
   #ENDIF
+  #!  ---- the table, when no Lookup Key told us ----------------------------
+  #!  STRING(@s15),USE(MAJ:Description) IS the answer: the field names its
+  #!  own file, and it is the description field as well.  #FIND(%Field,..)
+  #!  fixes %File (ABWINDOW.TPW:2103 uses it the same way); it is verified by
+  #!  comparing the result, because a miss leaves the previous fix in place.
+  #IF(%pgHitFile = '' AND %pgUse)
+    #IF(SUB(%pgUse,1,1) <> '?')
+      #FIND(%Field,%pgUse)
+      #IF(UPPER(%Field) = UPPER(%pgUse))
+        #SET(%pgHitFile,%File)
+        #SET(%pgHitDescFld,%Field)
+      #ENDIF
+    #ENDIF
+  #ENDIF
+  #IF(%pgHitFile = '' AND %pgHitDrop)             #! DROPID('Majors')
+    #FOR(%File),WHERE(UPPER(%File) = UPPER(%pgHitDrop))
+      #SET(%pgHitFile,%File)
+      #BREAK
+    #ENDFOR
+  #ENDIF
+  #!  ---- the code field, when no Lookup Key told us ------------------------
+  #!  Take the side of a MANY:1 relation that is NOT the entry's own field;
+  #!  otherwise the lookup table's primary key, first component.
+  #IF(%pgHitFile AND %pgHitCodeFld = '')
+    #SET(%pgCodeFile,'')
+    #IF(%pgHitCodeUse)
+      #IF(SUB(%pgHitCodeUse,1,1) <> '?')
+        #FIND(%Field,%pgHitCodeUse)
+        #IF(UPPER(%Field) = UPPER(%pgHitCodeUse))
+          #SET(%pgCodeFile,%File)
+        #ENDIF
+      #ENDIF
+    #ENDIF
+    #IF(%pgCodeFile)
+      #FIX(%File,%pgCodeFile)
+      #FOR(%Relation),WHERE(UPPER(%Relation) = UPPER(%pgHitFile))
+        #FOR(%FileKeyField),WHERE(%FileKeyFieldLink)
+          #IF(UPPER(%FileKeyField) = UPPER(%pgHitCodeUse))
+            #SET(%pgHitCodeFld,%FileKeyFieldLink)
+          #ELSIF(UPPER(%FileKeyFieldLink) = UPPER(%pgHitCodeUse))
+            #SET(%pgHitCodeFld,%FileKeyField)
+          #ENDIF
+        #ENDFOR
+      #ENDFOR
+    #ENDIF
+    #!  a relation field must really belong to the lookup table
+    #IF(%pgHitCodeFld)
+      #SET(%pgTxt,'')
+      #FIX(%File,%pgHitFile)
+      #FOR(%Field),WHERE(UPPER(%Field) = UPPER(%pgHitCodeFld))
+        #SET(%pgTxt,%Field)
+        #BREAK
+      #ENDFOR
+      #IF(%pgTxt = '')
+        #SET(%pgHitCodeFld,'')
+      #ENDIF
+    #ENDIF
+    #IF(%pgHitCodeFld = '')
+      #FIX(%File,%pgHitFile)
+      #IF(%FilePrimaryKey)
+        #FIX(%Key,%FilePrimaryKey)
+        #FOR(%KeyField)
+          #SET(%pgHitCodeFld,%KeyField)
+          #BREAK
+        #ENDFOR
+      #ENDIF
+    #ENDIF
+  #ENDIF
   #IF(%pgHitFile)
     #FIX(%File,%pgHitFile)
     #IF(%pgUse)
@@ -1030,7 +1121,16 @@ PGFSave:%F2PObject ROUTINE
       #SET(%pgHitDescFld,%pgHitCodeFld)             #! a one column table - show the code
     #ENDIF
   #ENDIF
-  #IF(INSTRING('|' & UPPER(%pgHitCode) & '|',%pgSeen,1,1))
+  #!  Only a candidate that resolved to a table AND a code field is a lookup.
+  #!  A plain data entry with no browse next to it lands here and is dropped
+  #!  silently; one that clearly IS a trio but could not be identified (the
+  #!  description STRING shows a local variable, say) is counted so the
+  #!  developer knows to add it by hand.
+  #IF(%pgHitFile = '' OR %pgHitCodeFld = '')
+    #IF(%pgHitBtn AND %pgHitDesc)
+      #SET(%pgUnres,%pgUnres + 1)
+    #ENDIF
+  #ELSIF(INSTRING('|' & UPPER(%pgHitCode) & '|',%pgSeen,1,1))
     #SET(%pgSkipped,%pgSkipped + 1)                 #! already in the list - leave it alone
   #ELSE
     #ADD(%F2PLookup,ITEMS(%F2PLookup) + 1)
@@ -1047,7 +1147,7 @@ PGFSave:%F2PObject ROUTINE
     #SET(%pgAdded,%pgAdded + 1)
   #ENDIF
 #ENDFOR
-#SET(%F2PScanInfo,'added ' & %pgAdded & ', already listed ' & %pgSkipped & ', unconfigured buttons ' & %pgLoose)
+#SET(%F2PScanInfo,'added ' & %pgAdded & ', already listed ' & %pgSkipped & ', could not identify ' & %pgUnres)
 #!=============================================================================
 #!  Shared #GROUPs.  A #GROUP has no end marker and swallows everything after
 #!  it, so every #AT / #EMBED above must come FIRST - hence the include here,

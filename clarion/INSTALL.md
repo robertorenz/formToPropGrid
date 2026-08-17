@@ -197,20 +197,26 @@ the description** and writes the **code** back:
 **You do not have to fill that list in by hand.** The *Find them for me* box has a
 **Scan this window for lookups** button that reads what ABC already knows about the window:
 
+Every ENTRY/SPIN is a candidate; what follows it decides whether it is a lookup.
+
 | What it needs | Where it comes from | Certainty |
 |---|---|---|
-| the code ENTRY | any ENTRY/SPIN whose *Lookup Key* is set — ABC's own pre-edit or post-edit lookup prompts (`ABWINDOW.TPW:2058-2067`), which are children of `%Control` | exact |
-| the lookup FILE and the code field | `#FIND(%Key,<that key>)` fixes `%File` too (the trick `ABWINDOW.TPW:2096` uses); the key's component field **is** the code field | exact |
-| the `'...'` BUTTON | a `FieldLookupButton` instance pointing at this ENTRY (`%ControlToLookup`, `ABCONTRL.TPW:241`), or a button whose name contains `LOOKUP` | proven, or left blank |
+| the lookup FILE, way 1 | the ENTRY's *Lookup Key* — ABC's own pre-edit / post-edit prompts (`ABWINDOW.TPW:2058-2067`, children of `%Control`). `#FIND(%Key,<that key>)` fixes `%File` too (the trick `ABWINDOW.TPW:2096` uses) and the key's component field **is** the code field | exact |
+| the lookup FILE, way 2 | **the description STRING's own field.** `STRING(@S15),USE(MAJ:Description)` names the table (`Majors`) *and* the description field, with no template settings at all — this is what finds a **hand-wired** lookup (`ALRT(F10Key)`, `DROPID`, a browse call in an embed) | exact |
+| the lookup FILE, way 3 | `DROPID('Majors')` on the ENTRY, when it matches a table in the dictionary | exact |
+| the code field (ways 2/3) | the side of a MANY:1 **relation** that is not the ENTRY's own field, validated against the lookup table; otherwise the table's **primary key, first component** | good guess |
+| the `'...'` BUTTON | a `FieldLookupButton` pointing at this ENTRY (`%ControlToLookup`, `ABCONTRL.TPW:241`), a name containing `LOOKUP`, or **a caption of exactly `'...'`** (read with `EXTRACT(%ControlStatement,'BUTTON',1)`, quotes stripped as in `ABBROWSE.TPW:2759`) | proven, or left blank |
 | the description STRING | the first STRING/PROMPT after the ENTRY that has a **USE variable** (not a caption) | guess |
 | the description field | that variable when it is a field of the lookup file, else the file's first STRING/CSTRING/PSTRING field that is not the code field | guess |
+
+A candidate that resolves to **no table** is dropped — a plain data entry silently, one that
+looks like a trio (button *and* description present) counted as *could not identify*, which is
+what you see when the description STRING shows a local variable instead of a table field.
 
 The trio ends at the next data control (ENTRY/SPIN/LIST/COMBO/CHECK/OPTION/TEXT/SHEET/TAB),
 so a lookup never swallows the control after it. Results are **appended**; an entry whose code
 control is already listed is skipped, so re-scanning after you change the window is safe. The
-*Last scan* line reports `added N, already listed N, unconfigured buttons N` — that last count
-is the buttons that are not part of a detected trio, i.e. your hand-coded lookups, which you
-still add by hand.
+*Last scan* line reports `added N, already listed N, could not identify N`.
 
 > **A button is only paired when it proves it is the lookup**, because the generated code
 > `HIDE`s it — pairing "the next button on the window" would hide something like `?Btn_Save`.
@@ -425,6 +431,7 @@ the Added-rows code does for the row label. **If generated code disappears entir
 | The grid still shows the old code after a `'...'` browse | the window has no timer: `PendingSyncFrom` is counted down inside `TakeEvent`, which only runs on `EVENT:Timer` |
 | An added row shows the right value but never writes it back | *Live sync* off and no OK button resolved — nothing calls `PGFSave:`; or the row is marked *Read only* / uses the `Read only` or `Button` editor |
 | An added row shows a number as `1234.56000000` or a date as `82907` | the editor type is `Text` — pick `Date` / `Time` (and a picture) so the row is FORMATted |
-| *Scan this window for lookups* finds nothing | the ENTRYs have no *Lookup Key* set — the lookup is hand-coded in an embed, which cannot be detected; add those entries by hand (the *unconfigured buttons* count tells you how many candidates were skipped) |
+| *Scan this window for lookups* reports `could not identify N` | the trio is there but nothing names the table: the description STRING shows a **local variable** rather than a field of the lookup table, and the ENTRY has neither a *Lookup Key* nor a `DROPID`. Point the *Description control* at the table's field, or add that entry by hand |
+| *Scan this window for lookups* finds nothing at all | no ENTRY on the window is followed by anything that identifies a table — check you are on the right procedure, and that the description STRING really is `USE(PRE:Field)` |
 | The scan found the trio but left *Lookup button* blank | no button proved itself (no `FieldLookupButton` extension, no `LOOKUP` in the name) — pick it in the entry, or leave it: the button simply stays visible |
 | The scan filled in the wrong *Description field* | that one is a guess — correct it in the entry; a re-scan will not overwrite it |
