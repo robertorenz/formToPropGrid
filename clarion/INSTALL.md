@@ -420,6 +420,7 @@ the Added-rows code does for the row label. **If generated code disappears entir
 |---|---|
 | `Could not open include file ClaPropGrid.tpw` when registering | the `.tpw` is not in the same folder as the `.tpl` being registered |
 | The new prompts do not appear | the IDE was open during `-tr`; restart it |
+| A prompt-time action (e.g. *Scan this window for lookups*) behaves like the **previous** build — right prompts, old behaviour | same cause, and the one that bites hardest: the registry holds a *parsed* copy of the chain, and an IDE that was already open keeps serving it. Close the IDE, re-run `-tr`, reopen. Deploying the new `.tpl` alone changes nothing |
 | `Unresolved External PG_Create` | `propgrid.lib` missing from the project / linker path, or built with decorated names |
 | `Missing procedure definition: PG_CREATE(...)` | the `MODULE()` label in `PropGrid.clw` was changed back to `PROPGRID.DLL` |
 | `Label duplicated, second used: _PROPGRIDLINKMODE_` | the two mode defines were EQUATEd inside `PropGrid.inc`; they must arrive only as project defines |
