@@ -108,7 +108,7 @@ file — open them in a browser.
 | `bin/` | `propgrid.dll` (32-bit), `testhost.exe`, MSVC import lib |
 | `clarion/` | `PropGrid.inc/.clw` — wrapper class (source, compiles in any Clarion version); `ClaPropGrid.tpl/.tpw` — the template chain; `propgrid.lib` — pre-built Clarion import lib (works in Clarion 9–12); `INSTALL.md` |
 | `docs/` | `ClaPropGrid-classes.html` — class guide; `ClaPropGrid-cookbook.html` — every member with code; `ClaPropGrid-dll.html` — the flat C API (all EN/ES); `screenshot.png` |
-| `examples/` | `PropGridDemo/` — a hand-coded Clarion app exercising the whole class (three windows: every feature, a converted form, tabs) |
+| `examples/` | `PropGridDemo/` — a hand-coded Clarion app exercising the whole class (four windows: every feature, a converted form, tabs, a PDF-options settings dialog) |
 
 The engine is C-style code compiled as C++ purely because the D2D/DWrite COM
 headers are far cleaner that way; the exported surface is a flat C API,

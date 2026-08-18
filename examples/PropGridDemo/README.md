@@ -23,7 +23,7 @@ Set `CLARIONBIN` first if Clarion is not at `C:\clarion12\bin`:
 set CLARIONBIN=C:\clarion11\bin && build.bat
 ```
 
-`PropGridDemo.exe 1`, `2` or `3` opens one window straight away and quits when
+`PropGridDemo.exe 1`, `2`, `3` or `4` opens one window straight away and quits when
 it closes — handy for a quick look at one feature.
 
 ## What each window shows
@@ -67,11 +67,37 @@ OK/Cancel) turned into a grid at run time.
   live and working next to the grid.
 - `TrimTabs()` runs **last** and hides the two tabs the conversion emptied.
 
+### 4 — A settings dialog: PDF export
+
+What a property grid is actually best at — a long, grouped settings list where
+some settings govern others. Thirty-odd options across **Output, Compression,
+Fonts, Document, Security and Viewer**, using every editor type because a real
+options dialog needs them.
+
+The point of the window is the **rules**, applied by a derived class in
+`ApplyRules`, called from `TakeChanged` on every edit:
+
+| Change this | And this happens |
+|---|---|
+| Page size → `Custom` | *Custom width* and *height* stop being read-only |
+| *Compress images* off | image compression, quality and both downsample rows grey out |
+| Image compression → `Flate (lossless)` | *Image quality* greys out — there is nothing to trade |
+| *PDF/A-1b compliant* on | *Embed fonts* is forced on and locked, *Encrypt* forced off and locked |
+| *Encrypt* off | the two passwords and all three permissions grey out |
+| anything | the wrapped **Summary** row rewrites itself to describe the current settings in a sentence |
+
+`SetValue` never raises an event, so forcing a value from inside `TakeChanged`
+cannot loop back. That is what makes this pattern safe.
+
+Also shown here: `SetExpanded` (Viewer starts collapsed), a per-category mono
+font on the Compression numbers, `FindRow` used instead of keeping every row id,
+and a wrapped read-only row that grows as its text changes.
+
 ## Files
 
 | File | What it is |
 |---|---|
-| `PropGridDemo.clw` | The whole demo — one PROGRAM, three procedures, one derived class |
+| `PropGridDemo.clw` | The whole demo — one PROGRAM, four procedures, two derived classes |
 | `PropGridDemo.cwproj` | Minimal Clarion project; the class is pulled in by its own `LINK()` attribute |
 | `build.bat` | Stages the class + lib, builds, then stages the DLL |
 

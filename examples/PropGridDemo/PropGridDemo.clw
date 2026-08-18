@@ -27,6 +27,7 @@
 DemoEverything  PROCEDURE()
 DemoForm        PROCEDURE()
 DemoTabs        PROCEDURE()
+DemoPdfOptions  PROCEDURE()
   END
 
 !---------------------------------------------------------------------
@@ -42,12 +43,48 @@ TakeChanged  PROCEDURE(SIGNED row),DERIVED
 
 LastEvent   STRING(160)               ! what the derived class saw
 
+!---------------------------------------------------------------------
+!  The PDF options window has RULES - one setting greys out another -
+!  so it gets its own derived class.  TakeChanged fires on every edit,
+!  which is exactly where a rule engine belongs.
+!
+!  The row ids live at module scope because the class needs them and
+!  the rows are built in the procedure.  FindRow('Compress images')
+!  would work too and save the variables, at the cost of a string
+!  compare per rule per keystroke.
+!---------------------------------------------------------------------
+PdfGrid  CLASS(PropGridClass)
+TakeChanged  PROCEDURE(SIGNED row),DERIVED
+ApplyRules   PROCEDURE()
+         END
+
+PdfR:PageSize   SIGNED
+PdfR:CustomW    SIGNED
+PdfR:CustomH    SIGNED
+PdfR:CompImages SIGNED
+PdfR:ImageComp  SIGNED
+PdfR:Quality    SIGNED
+PdfR:DownAbove  SIGNED
+PdfR:DownTo     SIGNED
+PdfR:EmbedFonts SIGNED
+PdfR:Subset     SIGNED
+PdfR:SubsetPct  SIGNED
+PdfR:PdfA       SIGNED
+PdfR:Encrypt    SIGNED
+PdfR:OwnerPwd   SIGNED
+PdfR:UserPwd    SIGNED
+PdfR:AllowPrint SIGNED
+PdfR:AllowCopy  SIGNED
+PdfR:AllowMod   SIGNED
+PdfR:Summary    SIGNED
+
 !---- launcher -------------------------------------------------------
-MainWin WINDOW('ClaPropGrid demo'),AT(,,220,120),GRAY,SYSTEM,FONT('Segoe UI',9)
+MainWin WINDOW('ClaPropGrid demo'),AT(,,220,148),GRAY,SYSTEM,FONT('Segoe UI',9)
           BUTTON('1 - &Everything the class does'),AT(10,10,200,20),USE(?BtnEvery)
           BUTTON('2 - Convert a &form at run time'),AT(10,36,200,20),USE(?BtnForm)
           BUTTON('3 - &Tabs, categories, TrimTabs'),AT(10,62,200,20),USE(?BtnTabs)
-          BUTTON('E&xit'),AT(10,92,200,18),USE(?BtnExit),STD(STD:Close)
+          BUTTON('4 - A settings dialog: &PDF export'),AT(10,88,200,20),USE(?BtnPdf)
+          BUTTON('E&xit'),AT(10,120,200,18),USE(?BtnExit),STD(STD:Close)
         END
 
   CODE
@@ -58,6 +95,7 @@ MainWin WINDOW('ClaPropGrid demo'),AT(,,220,120),GRAY,SYSTEM,FONT('Segoe UI',9)
   OF '1' ; DemoEverything() ; RETURN
   OF '2' ; DemoForm()       ; RETURN
   OF '3' ; DemoTabs()       ; RETURN
+  OF '4' ; DemoPdfOptions() ; RETURN
   END
 
   OPEN(MainWin)
@@ -66,6 +104,7 @@ MainWin WINDOW('ClaPropGrid demo'),AT(,,220,120),GRAY,SYSTEM,FONT('Segoe UI',9)
     OF ?BtnEvery ; DemoEverything()
     OF ?BtnForm  ; DemoForm()
     OF ?BtnTabs  ; DemoTabs()
+    OF ?BtnPdf   ; DemoPdfOptions()
     END
   END
   CLOSE(MainWin)
@@ -473,6 +512,160 @@ Win WINDOW('3 - tabs, categories, TrimTabs'),AT(,,520,320),GRAY,SYSTEM,RESIZE,TI
   RETURN
 
 !=====================================================================
+!  4 - a settings dialog: PDF export options
+!
+!  What a property grid is actually best at: a long, grouped settings
+!  list where some settings govern others.  Every editor type is here
+!  because a real options dialog needs them, not to show off - and the
+!  rules (PDF/A forbids encryption, a lossless method makes quality
+!  meaningless, a custom page size needs width and height) are applied
+!  by the derived class in ApplyRules, called from TakeChanged.
+!=====================================================================
+DemoPdfOptions PROCEDURE()
+Grid        PdfGrid                         ! the rule-aware derived class
+cOut        SIGNED
+cComp       SIGNED
+cFont       SIGNED
+cDoc        SIGNED
+cSec        SIGNED
+cView       SIGNED
+cAct        SIGNED
+rExport     SIGNED
+rCancel     SIGNED
+fMono       SIGNED
+Status      STRING(200)
+
+Win WINDOW('4 - PDF export options'),AT(,,400,430),GRAY,SYSTEM,RESIZE,TIMER(10),FONT('Segoe UI',9)
+      REGION,AT(4,4,392,392),USE(?PGRegion)
+      STRING(@s200),AT(6,402,388,10),USE(Status)
+      BUTTON('Export'),AT(6,416,60,12),USE(?ExportBtn),HIDE
+      BUTTON('Cancel'),AT(70,416,60,12),USE(?CancelBtn),HIDE
+    END
+
+  CODE
+  OPEN(Win)
+  IF ~Grid.Init(Win, ?PGRegion, PGS:Border + PGS:Description)
+    CLOSE(Win) ; RETURN
+  END
+
+  Grid.SetFont(PGF:Category, 'Segoe UI', 9, 1, 0)
+  Grid.SetSplitter(170)
+  fMono = Grid.AddFont('Consolas', 9, 0, 0)   ! for the numeric settings
+
+  !---- Output ------------------------------------------------------
+  cOut = Grid.AddCategory('Output')
+  Grid.AddProperty(cOut, 'File name', PGT:Text, 'invoice-2026-08.pdf')
+  PdfR:PageSize = Grid.AddProperty(cOut, 'Page size', PGT:Drop, 'A4')
+  Grid.SetChoices(PdfR:PageSize, 'A4|Letter|Legal|A3|Tabloid|Custom')
+  Grid.SetDescription(PdfR:PageSize, 'Pick Custom to enable the width and height below.')
+  PdfR:CustomW = Grid.AddProperty(cOut, 'Custom width (mm)', PGT:Spin, '210')
+  Grid.SetRange(PdfR:CustomW, 10, 2000, 1)
+  PdfR:CustomH = Grid.AddProperty(cOut, 'Custom height (mm)', PGT:Spin, '297')
+  Grid.SetRange(PdfR:CustomH, 10, 2000, 1)
+  Grid.AddProperty(cOut, 'Orientation', PGT:Radio, 'Portrait')
+  Grid.SetChoices(Grid.FindRow('Orientation'), 'Portrait|Landscape')
+  Grid.AddProperty(cOut, 'Resolution (dpi)', PGT:Drop, '300')
+  Grid.SetChoices(Grid.FindRow('Resolution (dpi)'), '72|150|300|600|1200')
+  Grid.AddProperty(cOut, 'Margin (mm)', PGT:Spin, '10')
+  Grid.SetRange(Grid.FindRow('Margin (mm)'), 0, 100, 1)
+
+  !---- Compression -------------------------------------------------
+  cComp = Grid.AddCategory('Compression')
+  Grid.AddProperty(cComp, 'Compress text and line art', PGT:Check, '1')
+  Grid.SetDescription(Grid.FindRow('Compress text and line art'), |
+      'Flate-compresses the page content stream. Lossless - no reason to turn it off.')
+  PdfR:CompImages = Grid.AddProperty(cComp, 'Compress images', PGT:Check, '1')
+  Grid.SetDescription(PdfR:CompImages, 'Turn this off and the four settings below grey out.')
+  PdfR:ImageComp = Grid.AddProperty(cComp, 'Image compression', PGT:Drop, 'JPEG')
+  Grid.SetChoices(PdfR:ImageComp, 'JPEG|Flate (lossless)|JPEG 2000|Automatic')
+  PdfR:Quality = Grid.AddProperty(cComp, 'Image quality', PGT:Slider, '85')
+  Grid.SetRange(PdfR:Quality, 1, 100, 1)
+  Grid.SetDescription(PdfR:Quality, 'Lossy methods only - Flate greys this out.')
+  PdfR:DownAbove = Grid.AddProperty(cComp, 'Downsample images above (dpi)', PGT:Spin, '225')
+  Grid.SetRange(PdfR:DownAbove, 72, 2400, 25)
+  PdfR:DownTo = Grid.AddProperty(cComp, 'Downsample to (dpi)', PGT:Spin, '150')
+  Grid.SetRange(PdfR:DownTo, 72, 1200, 25)
+
+  !---- Fonts -------------------------------------------------------
+  cFont = Grid.AddCategory('Fonts')
+  PdfR:EmbedFonts = Grid.AddProperty(cFont, 'Embed fonts', PGT:Check, '1')
+  Grid.SetDescription(PdfR:EmbedFonts, 'Required by PDF/A, which is why it locks when you tick that.')
+  PdfR:Subset = Grid.AddProperty(cFont, 'Subset embedded fonts', PGT:Check, '1')
+  PdfR:SubsetPct = Grid.AddProperty(cFont, 'Subset if used under (%)', PGT:Spin, '35')
+  Grid.SetRange(PdfR:SubsetPct, 1, 100, 1)
+
+  !---- Document ----------------------------------------------------
+  cDoc = Grid.AddCategory('Document')
+  Grid.AddProperty(cDoc, 'Title', PGT:Text, 'Invoice 2026-08')
+  Grid.AddProperty(cDoc, 'Author', PGT:Text, 'Acme Manufacturing')
+  Grid.AddProperty(cDoc, 'Keywords', PGT:MultiText, 'invoice, august, 2026, acme, statement')
+  Grid.SetRowWrap(Grid.FindRow('Keywords'), 2)
+  Grid.AddProperty(cDoc, 'PDF version', PGT:Drop, '1.7')
+  Grid.SetChoices(Grid.FindRow('PDF version'), '1.4|1.5|1.6|1.7|2.0')
+  PdfR:PdfA = Grid.AddProperty(cDoc, 'PDF/A-1b compliant', PGT:Check, '0')
+  Grid.SetDescription(PdfR:PdfA, 'Archival format: forces embedded fonts and forbids encryption.')
+  Grid.AddProperty(cDoc, 'Produced', PGT:Date, FORMAT(TODAY(), @d17))
+  Grid.SetReadOnly(Grid.FindRow('Produced'))
+  Grid.AddProperty(cDoc, 'Producer', PGT:ReadOnly, 'ClaPropGrid demo 1.2')
+
+  !---- Security ----------------------------------------------------
+  cSec = Grid.AddCategory('Security')
+  PdfR:Encrypt = Grid.AddProperty(cSec, 'Encrypt the document', PGT:Check, '0')
+  PdfR:OwnerPwd = Grid.AddProperty(cSec, 'Owner password', PGT:Password, '')
+  PdfR:UserPwd = Grid.AddProperty(cSec, 'User password', PGT:Password, '')
+  PdfR:AllowPrint = Grid.AddProperty(cSec, 'Allow printing', PGT:Check, '1')
+  PdfR:AllowCopy = Grid.AddProperty(cSec, 'Allow copying text', PGT:Check, '1')
+  PdfR:AllowMod = Grid.AddProperty(cSec, 'Allow modification', PGT:Check, '0')
+
+  !---- Viewer ------------------------------------------------------
+  cView = Grid.AddCategory('Viewer')
+  Grid.AddProperty(cView, 'Initial zoom', PGT:Drop, 'Fit page')
+  Grid.SetChoices(Grid.FindRow('Initial zoom'), 'Fit page|Fit width|Actual size|100%|150%')
+  Grid.AddProperty(cView, 'Open bookmarks panel', PGT:Check, '0')
+  Grid.AddProperty(cView, 'Link border colour', PGT:Color, '3D6DA8')
+  Grid.SetExpanded(cView, 0)                  ! start this one collapsed
+
+  !---- what the settings add up to, on a row that grows -------------
+  PdfR:Summary = Grid.AddProperty(0, 'Summary', PGT:ReadOnly, '')
+  Grid.SetRowWrap(PdfR:Summary, -1)
+  Grid.SetReadOnly(PdfR:Summary)
+
+  !---- Actions -----------------------------------------------------
+  cAct = Grid.AddCategory('Actions')
+  rExport = Grid.AddProperty(cAct, 'Export', PGT:Button, 'Export PDF')
+  Grid.SetTag(rExport, ?ExportBtn)
+  rCancel = Grid.AddProperty(cAct, 'Cancel', PGT:Button, 'Cancel')
+  Grid.SetTag(rCancel, ?CancelBtn)
+
+  !  the numeric settings read better in a mono font
+  Grid.SetCategoryFont(cComp, PGF:Inherit, PGF:Inherit, fMono)
+
+  Grid.ApplyRules()                           ! grey out whatever starts disabled
+  Grid.Redraw()
+  Status = 'Change a setting and watch the rules: Page size, Compress images, PDF/A, Encrypt.'
+  DISPLAY(?Status)
+
+  ACCEPT
+    CASE EVENT()
+    OF EVENT:Timer
+      Grid.TakeEvent()
+    OF EVENT:Sized
+      Grid.Reposition()
+    END
+    CASE ACCEPTED()
+    OF ?ExportBtn
+      Status = 'Export: ' & CLIP(Grid.GetValue(PdfR:Summary))
+      DISPLAY(?Status)
+    OF ?CancelBtn
+      POST(EVENT:CloseWindow)
+    END
+  END
+
+  Grid.Kill()
+  CLOSE(Win)
+  RETURN
+
+!=====================================================================
 !  the derived class
 !=====================================================================
 DemoGrid.TakeSelect PROCEDURE(SIGNED row)
@@ -484,3 +677,104 @@ DemoGrid.TakeChanged PROCEDURE(SIGNED row)
   PARENT.TakeChanged(row)                    ! keeps LiveSync working
   LastEvent = 'TakeChanged: row ' & row & ' is now "' & |
               CLIP(SELF.GetValue(row)) & '"'
+
+
+!---------------------------------------------------------------------
+!  the PDF window's rules
+!---------------------------------------------------------------------
+PdfGrid.TakeChanged PROCEDURE(SIGNED row)
+  CODE
+  PARENT.TakeChanged(row)                     ! keep LiveSync working
+  SELF.ApplyRules()                           ! then re-apply every rule
+
+!  One setting governs another.  SetValue never raises an event, so
+!  forcing a value in here cannot loop back into TakeChanged.
+PdfGrid.ApplyRules PROCEDURE()
+Custom  BYTE
+DoComp  BYTE
+Lossy   BYTE
+PdfA    BYTE
+DoEnc   BYTE
+Sum     STRING(300)
+  CODE
+  IF ~SELF.Initialized THEN RETURN.
+
+  !-- a custom page size needs its width and height ------------------
+  Custom = CHOOSE(CLIP(SELF.GetValue(PdfR:PageSize)) = 'Custom', 1, 0)
+  SELF.SetReadOnly(PdfR:CustomW, 1 - Custom)
+  SELF.SetReadOnly(PdfR:CustomH, 1 - Custom)
+
+  !-- no image compression, nothing to configure ---------------------
+  DoComp = CHOOSE(CLIP(SELF.GetValue(PdfR:CompImages)) = '1', 1, 0)
+  SELF.SetReadOnly(PdfR:ImageComp, 1 - DoComp)
+  SELF.SetReadOnly(PdfR:DownAbove, 1 - DoComp)
+  SELF.SetReadOnly(PdfR:DownTo,    1 - DoComp)
+
+  !-- quality is meaningless unless the method is lossy --------------
+  Lossy = 0
+  IF DoComp
+    CASE CLIP(SELF.GetValue(PdfR:ImageComp))
+    OF 'JPEG' OROF 'JPEG 2000' OROF 'Automatic'
+      Lossy = 1
+    END
+  END
+  SELF.SetReadOnly(PdfR:Quality, 1 - Lossy)
+
+  !-- the subset threshold only matters when subsetting --------------
+  SELF.SetReadOnly(PdfR:SubsetPct, |
+      CHOOSE(CLIP(SELF.GetValue(PdfR:Subset)) = '1', 0, 1))
+
+  !-- PDF/A: fonts must be embedded, encryption is forbidden ---------
+  PdfA = CHOOSE(CLIP(SELF.GetValue(PdfR:PdfA)) = '1', 1, 0)
+  IF PdfA
+    SELF.SetValue(PdfR:EmbedFonts, '1')
+    SELF.SetValue(PdfR:Encrypt, '0')
+  END
+  SELF.SetReadOnly(PdfR:EmbedFonts, PdfA)
+  SELF.SetReadOnly(PdfR:Encrypt, PdfA)
+
+  !-- the permissions only exist inside an encrypted document --------
+  DoEnc = 0
+  IF ~PdfA AND CLIP(SELF.GetValue(PdfR:Encrypt)) = '1' THEN DoEnc = 1.
+  SELF.SetReadOnly(PdfR:OwnerPwd,   1 - DoEnc)
+  SELF.SetReadOnly(PdfR:UserPwd,    1 - DoEnc)
+  SELF.SetReadOnly(PdfR:AllowPrint, 1 - DoEnc)
+  SELF.SetReadOnly(PdfR:AllowCopy,  1 - DoEnc)
+  SELF.SetReadOnly(PdfR:AllowMod,   1 - DoEnc)
+
+  !-- say out loud what the settings add up to, on a wrapped row -----
+  Sum = CLIP(SELF.GetValue(PdfR:PageSize)) & ' page'
+  IF Custom
+    Sum = CLIP(Sum) & ' (' & CLIP(SELF.GetValue(PdfR:CustomW)) & ' x ' & |
+          CLIP(SELF.GetValue(PdfR:CustomH)) & ' mm)'
+  END
+  Sum = CLIP(Sum) & ', text compressed'
+  IF DoComp
+    Sum = CLIP(Sum) & ', images as ' & CLIP(SELF.GetValue(PdfR:ImageComp))
+    IF Lossy
+      Sum = CLIP(Sum) & ' at quality ' & CLIP(SELF.GetValue(PdfR:Quality))
+    END
+    Sum = CLIP(Sum) & ', downsampled to ' & CLIP(SELF.GetValue(PdfR:DownTo)) & ' dpi'
+  ELSE
+    Sum = CLIP(Sum) & ', images stored uncompressed'
+  END
+  IF CLIP(SELF.GetValue(PdfR:EmbedFonts)) = '1'
+    Sum = CLIP(Sum) & ', fonts embedded'
+    IF CLIP(SELF.GetValue(PdfR:Subset)) = '1' THEN Sum = CLIP(Sum) & ' and subset'.
+  ELSE
+    Sum = CLIP(Sum) & ', fonts NOT embedded'
+  END
+  IF PdfA
+    Sum = CLIP(Sum) & '. PDF/A-1b: archival, never encrypted.'
+  ELSIF DoEnc
+    Sum = CLIP(Sum) & '. Encrypted'
+    IF CLIP(SELF.GetValue(PdfR:AllowPrint)) = '1'
+      Sum = CLIP(Sum) & ', printing allowed.'
+    ELSE
+      Sum = CLIP(Sum) & ', printing blocked.'
+    END
+  ELSE
+    Sum = CLIP(Sum) & '. Not encrypted.'
+  END
+  SELF.SetValue(PdfR:Summary, CLIP(Sum))
+  SELF.Redraw()
