@@ -1,0 +1,1486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaPropGrid — DLL API / API de la DLL</title>
+<style>
+  :root{
+    --blue:#0A66C2; --blue-d:#084d93; --navy:#0E1A2B; --navy-2:#16263c;
+    --ink:#22303f; --muted:#6b7785; --line:#e3e8ef; --bg:#f5f7fa;
+    --card:#ffffff; --green:#1e7c5a; --amber:#9a6a12; --amber-bg:#fff7e8;
+    --green-bg:#eef8f3; --blue-bg:#eef4fc; --red-bg:#fcecec; --red:#b23a2e;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font:15px/1.65 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg)}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{display:flex;min-height:100vh}
+  nav{width:280px;flex:0 0 280px;background:linear-gradient(180deg,var(--navy),var(--navy-2));
+    color:#cdd8e6;position:sticky;top:0;height:100vh;overflow-y:auto;padding:22px 0}
+  nav .brand{padding:0 22px 16px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:10px}
+  nav .brand h1{font-size:16px;margin:0;color:#fff} nav .brand span{font-size:12px;color:#8aa0bb}
+  nav a{display:block;color:#b9c7d8;padding:6px 22px;font-size:13.5px;border-left:3px solid transparent}
+  nav a:hover{background:rgba(255,255,255,.05);color:#fff;text-decoration:none}
+  nav a.h2{padding-left:34px;font-size:13px;color:#9fb2c8}
+  nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6e85a1;
+    padding:14px 22px 4px;font-weight:700}
+  main{flex:1;min-width:0}
+  header.hero{background:linear-gradient(120deg,#0c2a4d,var(--blue));color:#fff;padding:46px 52px 30px}
+  header.hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.3px}
+  header.hero p{margin:0;font-size:15.5px;color:#dbe8f8;max-width:780px}
+  header.hero .pill{display:inline-block;margin-top:16px;background:rgba(255,255,255,.16);
+    padding:4px 12px;border-radius:20px;font-size:12.5px}
+  .langbar{display:flex;gap:8px;padding:14px 52px 0;background:var(--bg);position:sticky;top:0;z-index:20;
+    border-bottom:1px solid var(--line)}
+  .langbar button{cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:7px 16px;border-radius:8px 8px 0 0;font:600 13.5px/1 inherit;border-bottom:none}
+  .langbar button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .body{padding:14px 52px 80px;max-width:940px}
+  section{padding:22px 0;border-bottom:1px solid var(--line);scroll-margin-top:50px} section:last-child{border-bottom:none}
+  h2{font-size:21px;margin:14px 0 10px;color:var(--navy);scroll-margin-top:50px}
+  h3{font-size:16px;margin:20px 0 6px;color:var(--blue-d)}
+  h4{font-size:14px;margin:16px 0 4px;color:var(--navy)}
+  p{margin:9px 0} ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0}
+  code,kbd,pre{font-family:"Cascadia Code",Consolas,monospace}
+  code{background:#eef1f5;padding:1px 6px;border-radius:4px;font-size:13px;color:#1d3b5e}
+  pre{background:#0f1d2e;color:#dbe6f2;padding:16px 18px;border-radius:10px;overflow:auto;
+    font-size:13px;line-height:1.55;margin:12px 0}
+  pre .c{color:#7fa6c9} pre .k{color:#79c0ff} pre .s{color:#7ee0b8} pre .t{color:#ffd591}
+  .callout{border-radius:8px;padding:12px 16px;margin:14px 0;font-size:14px;border:1px solid}
+  .tip{background:var(--green-bg);border-color:#bfe3d3;color:#155}
+  .note{background:var(--blue-bg);border-color:#c5dcf6;color:#13456f}
+  .warn{background:var(--amber-bg);border-color:#ecd9a6;color:#6f5210}
+  .danger{background:var(--red-bg);border-color:#f0c9c3;color:#7a2b20}
+  .callout b{display:block;margin-bottom:2px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f0f4f9;color:var(--navy);font-weight:600}
+  tr:hover td{background:#fafcff}
+  td code{white-space:nowrap}
+  .lead{font-size:16px;color:#3a4756}
+  .sig{background:#0f1d2e;color:#ffd591;padding:9px 14px;border-radius:8px;font-family:"Cascadia Code",Consolas,monospace;
+    font-size:13px;margin:16px 0 6px;overflow:auto}
+  .src{font-size:12px;color:var(--muted);font-family:"Cascadia Code",Consolas,monospace}
+  footer{padding:24px 52px;color:var(--muted);font-size:13px}
+  .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.15)}
+  .ord{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+  /* language toggle */
+  html[data-lang="en"] .es{display:none}
+  html[data-lang="es"] .en{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand"><h1>ClaPropGrid</h1><span class="en">DLL API · PROPGRID.DLL · v1.2</span><span class="es">API de la DLL · PROPGRID.DLL · v1.2</span></div>
+    <a href="#over"><span class="en">Overview</span><span class="es">Resumen</span></a>
+    <div class="grp"><span class="en">Using the DLL</span><span class="es">Usar la DLL</span></div>
+    <a href="#abi" class="h2"><span class="en">Calling convention</span><span class="es">Convención de llamada</span></a>
+    <a href="#life" class="h2"><span class="en">Lifetime &amp; the handle</span><span class="es">Vida y el handle</span></a>
+    <a href="#bind" class="h2"><span class="en">Binding from a language</span><span class="es">Enlazar desde un lenguaje</span></a>
+    <div class="grp"><span class="en">The state it holds</span><span class="es">El estado que guarda</span></div>
+    <a href="#state" class="h2"><span class="en">Per-grid state</span><span class="es">Estado por rejilla</span></a>
+    <a href="#rowstate" class="h2"><span class="en">Per-row / per-category</span><span class="es">Por fila / por categoría</span></a>
+    <div class="grp"><span class="en">Function reference</span><span class="es">Referencia de funciones</span></div>
+    <a href="#f-life" class="h2"><span class="en">Lifetime &amp; placement</span><span class="es">Vida y colocación</span></a>
+    <a href="#f-look" class="h2"><span class="en">Appearance</span><span class="es">Apariencia</span></a>
+    <a href="#f-font" class="h2"><span class="en">Fonts &amp; wrapping</span><span class="es">Fuentes y envoltura</span></a>
+    <a href="#f-build" class="h2"><span class="en">Building the grid</span><span class="es">Construir la rejilla</span></a>
+    <a href="#f-value" class="h2"><span class="en">Values</span><span class="es">Valores</span></a>
+    <a href="#f-event" class="h2"><span class="en">Events</span><span class="es">Eventos</span></a>
+    <div class="grp"><span class="en">Constants</span><span class="es">Constantes</span></div>
+    <a href="#consts" class="h2"><span class="en">Every #define</span><span class="es">Cada #define</span></a>
+    <a href="#ordinals" class="h2"><span class="en">Export ordinals</span><span class="es">Ordinales de exportación</span></a>
+    <div class="grp"><span class="en">Notes</span><span class="es">Notas</span></div>
+    <a href="#limits" class="h2"><span class="en">Threads, DPI, limits</span><span class="es">Hilos, DPI, límites</span></a>
+    <a href="#example" class="h2"><span class="en">A complete C host</span><span class="es">Un host C completo</span></a>
+    <a href="#gotchas" class="h2"><span class="en">Gotchas</span><span class="es">Trampas</span></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <h1>PROPGRID.DLL</h1>
+      <p class="en">The flat C API underneath everything else: 42 exported functions, one opaque handle
+      per grid, no COM, no classes and no callbacks you have to implement. This is the layer
+      <code>PropGridClass</code> wraps &#8212; and the one to bind to from any language that can call
+      <code>__stdcall</code>. Written from <code>src\propgrid.h</code> and <code>src\propgrid.cpp</code>;
+      the line references point at the shipped source.</p>
+      <p class="es">La API C plana que hay debajo de todo lo demás: 42 funciones exportadas, un handle
+      opaco por rejilla, sin COM, sin clases y sin callbacks que usted tenga que implementar. Es la capa
+      que envuelve <code>PropGridClass</code> &#8212; y a la que hay que enlazar desde cualquier lenguaje
+      que sepa llamar <code>__stdcall</code>. Redactada a partir de <code>src\propgrid.h</code> y
+      <code>src\propgrid.cpp</code>; las referencias de línea apuntan al código entregado.</p>
+      <span class="pill">42 exports · __stdcall · ANSI · undecorated names · pinned ordinals · 32-bit</span>
+    </header>
+
+    <div class="langbar">
+      <button id="btn-en" onclick="setLang('en')">English</button>
+      <button id="btn-es" onclick="setLang('es')">Español</button>
+    </div>
+
+    <div class="body">
+
+<section id="over">
+  <h2><span class="en">Overview</span><span class="es">Resumen</span></h2>
+  <div class="en">
+    <p class="lead">One call creates a grid over a parent window and hands back an <code>HPG</code>. Every
+    other call takes that handle back. There is no object, no interface and no inheritance &#8212; all the
+    state lives inside the DLL and you reach it through <code>PG_Set…</code> / <code>PG_Get…</code>
+    pairs.</p>
+    <table>
+      <tr><th>Property in the OO sense</th><th>What the DLL has instead</th></tr>
+      <tr><td>A class with fields</td><td>An opaque <code>HPG</code> (a <code>void*</code>) and functions
+        that take it as the first argument.</td></tr>
+      <tr><td>Public properties</td><td>Named <b>slots</b>: colours by <code>PGC_</code> index, fonts by
+        <code>PGF_</code> index, and a handful of scalar setters. All listed under
+        <a href="#state">Per-grid state</a>.</td></tr>
+      <tr><td>Per-item properties</td><td>Row and category <b>ids</b> (small positive integers) plus
+        setters that take one. See <a href="#rowstate">Per-row / per-category</a>.</td></tr>
+      <tr><td>Events</td><td>A poll queue (<code>PG_PollEvent</code>) and/or one optional
+        <code>__stdcall</code> callback.</td></tr>
+    </table>
+    <div class="callout note"><b>You probably want the class instead.</b> In Clarion,
+      <code>PropGridClass</code> already wraps every function here and adds the parts the DLL cannot know
+      about &#8212; reading the window, writing USE variables, folding lookups, tab categories. See
+      <a href="ClaPropGrid-classes.html">the class guide</a>. Bind to the DLL directly when you are not in
+      Clarion, or when you want the grid without any of the Clarion-specific behaviour.</div>
+    <h3>What one grid is</h3>
+    <p>A child window of the parent you pass in, created with
+    <code>WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL | WS_TABSTOP</code> and pinned to the top of
+    its siblings (Clarion SHEET/TAB controls otherwise paint over it). It draws itself with Direct2D and
+    DirectWrite, owns its own vertical scrollbar and in-place editors, and sends the host nothing except
+    the events you poll for.</p>
+  </div>
+  <div class="es">
+    <p class="lead">Una llamada crea una rejilla sobre una ventana padre y devuelve un <code>HPG</code>.
+    Todas las demás llamadas reciben ese handle de vuelta. No hay objeto, ni interfaz, ni herencia
+    &#8212; todo el estado vive dentro de la DLL y usted lo alcanza con pares
+    <code>PG_Set…</code> / <code>PG_Get…</code>.</p>
+    <table>
+      <tr><th>Propiedad en sentido OO</th><th>Lo que tiene la DLL en su lugar</th></tr>
+      <tr><td>Una clase con campos</td><td>Un <code>HPG</code> opaco (un <code>void*</code>) y funciones
+        que lo reciben como primer argumento.</td></tr>
+      <tr><td>Propiedades públicas</td><td><b>Ranuras</b> con nombre: colores por índice
+        <code>PGC_</code>, fuentes por índice <code>PGF_</code>, y un puñado de setters escalares. Todo
+        listado en <a href="#state">Estado por rejilla</a>.</td></tr>
+      <tr><td>Propiedades por elemento</td><td><b>Ids</b> de fila y categoría (enteros positivos pequeños)
+        más setters que reciben uno. Vea <a href="#rowstate">Por fila / por categoría</a>.</td></tr>
+      <tr><td>Eventos</td><td>Una cola de sondeo (<code>PG_PollEvent</code>) y/o un callback
+        <code>__stdcall</code> opcional.</td></tr>
+    </table>
+    <div class="callout note"><b>Probablemente quiera la clase.</b> En Clarion,
+      <code>PropGridClass</code> ya envuelve todas estas funciones y añade lo que la DLL no puede saber
+      &#8212; leer la ventana, escribir variables USE, plegar búsquedas, categorías por pestaña. Vea
+      <a href="ClaPropGrid-classes.html">la guía de la clase</a>. Enlace directo a la DLL cuando no esté en
+      Clarion, o cuando quiera la rejilla sin nada del comportamiento específico de Clarion.</div>
+    <h3>Qué es una rejilla</h3>
+    <p>Una ventana hija del padre que usted pasa, creada con
+    <code>WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS | WS_VSCROLL | WS_TABSTOP</code> y fijada arriba de sus
+    hermanas (si no, los SHEET/TAB de Clarion la pintan encima). Se dibuja con Direct2D y DirectWrite, tiene
+    su propia barra de desplazamiento vertical y sus editores en el sitio, y no manda nada al host salvo los
+    eventos que usted sondea.</p>
+  </div>
+</section>
+
+<section id="abi">
+  <h2><span class="en">Calling convention</span><span class="es">Convención de llamada</span></h2>
+  <div class="en">
+    <table>
+      <tr><th>Detail</th><th>Value</th></tr>
+      <tr><td>Architecture</td><td><b>32-bit x86 only.</b> Clarion applications are 32-bit; there is no
+        x64 build.</td></tr>
+      <tr><td>Convention</td><td><code>__stdcall</code> &#8212; callee cleans the stack. In Clarion that is
+        <code>PASCAL</code>.</td></tr>
+      <tr><td>Name decoration</td><td><b>None.</b> The exports are <code>PG_Create</code>, not
+        <code>_PG_Create@24</code> &#8212; which is why Clarion prototypes need <code>NAME('PG_Create')</code>
+        as well as <code>PASCAL</code>.</td></tr>
+      <tr><td>Ordinals</td><td>Pinned in <code>src\propgrid.def</code> and never renumbered. The Clarion
+        import library binds by ordinal; see <a href="#ordinals">Export ordinals</a>.</td></tr>
+      <tr><td>Strings in</td><td><code>const char*</code>, <b>ANSI</b> (the caller's code page), NUL
+        terminated. Converted to UTF-16 internally with <code>CP_ACP</code>.</td></tr>
+      <tr><td>Strings out</td><td>Written into a caller-supplied <code>char*</code> with a length. Never
+        allocated by the DLL, so there is nothing to free.</td></tr>
+      <tr><td>Colours</td><td>Win32 <code>COLORREF</code> &#8212; <code>0x00BBGGRR</code>, so the hex digits
+        read blue-green-red.</td></tr>
+      <tr><td>Booleans</td><td><code>int</code>, 0 = false, anything else = true.</td></tr>
+      <tr><td>Runtime</td><td>Statically linked (<code>/MT</code>). The only dependencies are stock Windows
+        DLLs &#8212; no VC++ redistributable, Windows 7 SP1 through 11.</td></tr>
+    </table>
+    <div class="callout tip"><b>Nothing is ever allocated across the boundary.</b> Every string the DLL
+      returns is copied into your buffer, and the only thing you own is the <code>HPG</code>, released by
+      <code>PG_Destroy</code>. There is no free function, and no way to leak by ignoring a return
+      value.</div>
+  </div>
+  <div class="es">
+    <table>
+      <tr><th>Detalle</th><th>Valor</th></tr>
+      <tr><td>Arquitectura</td><td><b>Sólo x86 de 32 bits.</b> Las aplicaciones Clarion son de 32 bits; no
+        hay compilación x64.</td></tr>
+      <tr><td>Convención</td><td><code>__stdcall</code> &#8212; el llamado limpia la pila. En Clarion eso es
+        <code>PASCAL</code>.</td></tr>
+      <tr><td>Decoración de nombres</td><td><b>Ninguna.</b> Las exportaciones son <code>PG_Create</code>, no
+        <code>_PG_Create@24</code> &#8212; por eso los prototipos Clarion necesitan
+        <code>NAME('PG_Create')</code> además de <code>PASCAL</code>.</td></tr>
+      <tr><td>Ordinales</td><td>Fijados en <code>src\propgrid.def</code> y nunca renumerados. La librería de
+        importación de Clarion enlaza por ordinal; vea <a href="#ordinals">Ordinales</a>.</td></tr>
+      <tr><td>Cadenas de entrada</td><td><code>const char*</code>, <b>ANSI</b> (la página de códigos del
+        llamador), terminadas en NUL. Se convierten a UTF-16 internamente con <code>CP_ACP</code>.</td></tr>
+      <tr><td>Cadenas de salida</td><td>Se escriben en un <code>char*</code> que usted aporta, con su
+        longitud. La DLL nunca reserva memoria, así que no hay nada que liberar.</td></tr>
+      <tr><td>Colores</td><td><code>COLORREF</code> de Win32 &#8212; <code>0x00BBGGRR</code>, así que los
+        dígitos hex se leen azul-verde-rojo.</td></tr>
+      <tr><td>Booleanos</td><td><code>int</code>, 0 = falso, cualquier otra cosa = verdadero.</td></tr>
+      <tr><td>Runtime</td><td>Enlazado estáticamente (<code>/MT</code>). Las únicas dependencias son DLLs
+        estándar de Windows &#8212; sin redistribuible de VC++, de Windows 7 SP1 a 11.</td></tr>
+    </table>
+    <div class="callout tip"><b>Nunca se reserva memoria a través de la frontera.</b> Toda cadena que
+      devuelve la DLL se copia en su buffer, y lo único que usted posee es el <code>HPG</code>, liberado por
+      <code>PG_Destroy</code>. No hay función de liberación, ni forma de tener fugas por ignorar un valor de
+      retorno.</div>
+  </div>
+</section>
+
+<section id="life">
+  <h2><span class="en">Lifetime &amp; the handle</span><span class="es">Vida y el handle</span></h2>
+  <div class="en">
+    <p class="lead">Four calls bracket everything: initialise the library, create a grid, destroy it, shut
+    the library down. The middle two are the only ones that matter per grid.</p>
+<pre><span class="t">PG_Initialize</span>();                                 <span class="c">// reference counted, once per process</span>
+<span class="t">HPG</span> pg = <span class="t">PG_Create</span>(hwndParent, x, y, w, h, style);
+   <span class="c">// ... build, run, poll ...</span>
+<span class="t">PG_Destroy</span>(pg);
+<span class="t">PG_Shutdown</span>();</pre>
+    <table>
+      <tr><th>Call</th><th>Behaviour</th></tr>
+      <tr><td><code>PG_Initialize</code> <span class="src">cpp:1602</span></td><td><b>Reference
+        counted.</b> The first call creates the Direct2D and DirectWrite factories, registers the window
+        class and calls <code>InitCommonControlsEx</code>; later calls just bump the count and return 1.
+        Returns 0 only if a factory could not be created. <code>PG_Create</code> calls it for you if you
+        forgot, so it is optional.</td></tr>
+      <tr><td><code>PG_Create</code> <span class="src">cpp:1633</span></td><td>Returns an
+        <code>HPG</code>, or <code>NULL</code> if the window could not be made. <code>x, y, w, h</code> are
+        <b>pixels</b> in the parent's client space. <code>style</code> is a bitwise OR of
+        <code>PGS_</code> flags; <code>0</code> is legal and gives a bare grid.</td></tr>
+      <tr><td><code>PG_Destroy</code> <span class="src">cpp:1683</span></td><td>Closes any open editor
+        without committing, destroys the child window and frees every row, category, font and registry.
+        The handle is dead afterwards &#8212; do not call anything else with it.</td></tr>
+      <tr><td><code>PG_Shutdown</code> <span class="src">cpp:1624</span></td><td>Decrements the count;
+        at zero it unregisters the window class and releases the factories. Safe to skip at process
+        exit.</td></tr>
+    </table>
+    <h3>What a fresh grid looks like</h3>
+    <p><code>PG_Create</code> sets these before it returns, so a grid is usable with no further
+    configuration:</p>
+    <table>
+      <tr><th>State</th><th>Value at create</th></tr>
+      <tr><td>Splitter (name column width)</td><td><code>w * 2 / 5</code>, floored at 48px</td></tr>
+      <tr><td>Description pane height</td><td>52px when <code>PGS_DESCRIPTION</code> is in the style, else
+        0</td></tr>
+      <tr><td>All four fonts</td><td>Segoe UI 9pt; the category slot bold</td></tr>
+      <tr><td>Row height</td><td>0 = automatic (derived from the fonts, and from wrapped text)</td></tr>
+      <tr><td>Palette</td><td>The professional steel-blue defaults listed under
+        <a href="#consts">Constants</a></td></tr>
+      <tr><td>DPI</td><td>Read from the window with <code>GetDpiForWindow</code> (falling back to the
+        desktop DC on older Windows). Point sizes are scaled by it.</td></tr>
+    </table>
+    <div class="callout warn"><b>The parent must have a message loop, and you must pump events.</b> The
+      grid raises everything through its own queue; nothing reaches the parent as a
+      <code>WM_COMMAND</code> or <code>WM_NOTIFY</code>. If you never call <code>PG_PollEvent</code> (or
+      register a callback) the grid still draws and still edits &#8212; you just never hear about it.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Cuatro llamadas enmarcan todo: inicializar la librería, crear una rejilla, destruirla,
+    cerrar la librería. Las dos del medio son las únicas que importan por rejilla.</p>
+<pre><span class="t">PG_Initialize</span>();                                 <span class="c">// con conteo de referencias, una vez por proceso</span>
+<span class="t">HPG</span> pg = <span class="t">PG_Create</span>(hwndParent, x, y, w, h, style);
+   <span class="c">// ... construir, ejecutar, sondear ...</span>
+<span class="t">PG_Destroy</span>(pg);
+<span class="t">PG_Shutdown</span>();</pre>
+    <table>
+      <tr><th>Llamada</th><th>Comportamiento</th></tr>
+      <tr><td><code>PG_Initialize</code> <span class="src">cpp:1602</span></td><td><b>Con conteo de
+        referencias.</b> La primera llamada crea las fábricas de Direct2D y DirectWrite, registra la clase
+        de ventana y llama a <code>InitCommonControlsEx</code>; las siguientes sólo suben el contador y
+        devuelven 1. Devuelve 0 sólo si no se pudo crear una fábrica. <code>PG_Create</code> la llama por
+        usted si se le olvidó, así que es opcional.</td></tr>
+      <tr><td><code>PG_Create</code> <span class="src">cpp:1633</span></td><td>Devuelve un
+        <code>HPG</code>, o <code>NULL</code> si no se pudo crear la ventana. <code>x, y, w, h</code> van en
+        <b>píxeles</b> del área cliente del padre. <code>style</code> es un OR de banderas
+        <code>PGS_</code>; <code>0</code> es válido y da una rejilla pelada.</td></tr>
+      <tr><td><code>PG_Destroy</code> <span class="src">cpp:1683</span></td><td>Cierra cualquier editor
+        abierto sin confirmar, destruye la ventana hija y libera cada fila, categoría, fuente y registro.
+        El handle queda muerto &#8212; no lo use para nada más.</td></tr>
+      <tr><td><code>PG_Shutdown</code> <span class="src">cpp:1624</span></td><td>Baja el contador; a cero
+        desregistra la clase de ventana y libera las fábricas. Se puede omitir al salir del proceso.</td></tr>
+    </table>
+    <h3>Cómo queda una rejilla recién creada</h3>
+    <p><code>PG_Create</code> deja esto antes de volver, así que la rejilla ya sirve sin configurar nada
+    más:</p>
+    <table>
+      <tr><th>Estado</th><th>Valor al crear</th></tr>
+      <tr><td>Divisor (ancho de la columna de nombres)</td><td><code>w * 2 / 5</code>, con mínimo 48px</td></tr>
+      <tr><td>Alto del panel de descripción</td><td>52px si <code>PGS_DESCRIPTION</code> está en el estilo,
+        si no 0</td></tr>
+      <tr><td>Las cuatro fuentes</td><td>Segoe UI 9pt; la ranura de categoría en negrita</td></tr>
+      <tr><td>Alto de fila</td><td>0 = automático (de las fuentes, y del texto envuelto)</td></tr>
+      <tr><td>Paleta</td><td>Los azules acero por defecto listados en
+        <a href="#consts">Constantes</a></td></tr>
+      <tr><td>DPI</td><td>Leído de la ventana con <code>GetDpiForWindow</code> (con respaldo al DC del
+        escritorio en Windows antiguos). Los tamaños en puntos se escalan con él.</td></tr>
+    </table>
+    <div class="callout warn"><b>El padre necesita un bucle de mensajes, y usted debe bombear los
+      eventos.</b> La rejilla levanta todo por su propia cola; nada llega al padre como
+      <code>WM_COMMAND</code> ni <code>WM_NOTIFY</code>. Si nunca llama a <code>PG_PollEvent</code> (ni
+      registra un callback) la rejilla igual se dibuja y se edita &#8212; usted simplemente no se
+      entera.</div>
+  </div>
+</section>
+
+<section id="bind">
+  <h2><span class="en">Binding from a language</span><span class="es">Enlazar desde un lenguaje</span></h2>
+  <div class="en">
+    <h3>Clarion</h3>
+    <p><code>PASCAL</code> for <code>__stdcall</code>, <code>NAME()</code> because the exports are
+    undecorated, and <code>RAW</code> wherever a pointer is passed (a <code>*CSTRING</code> or an out
+    parameter) so Clarion sends the address alone with no length behind it.</p>
+<pre>  <span class="k">MAP</span>
+    <span class="k">MODULE</span>(<span class="s">'ClaPropGridDLL'</span>)                <span class="c">! any label EXCEPT 'PROPGRID.DLL'</span>
+PG_Create   <span class="k">PROCEDURE</span>(<span class="k">UNSIGNED</span> hwndParent, <span class="k">SIGNED</span> x, <span class="k">SIGNED</span> y, |
+                      <span class="k">SIGNED</span> w, <span class="k">SIGNED</span> h, <span class="k">ULONG</span> style),<span class="k">LONG</span>,<span class="k">PASCAL</span>,<span class="k">NAME</span>(<span class="s">'PG_Create'</span>)
+PG_AddCategory <span class="k">PROCEDURE</span>(<span class="k">LONG</span> pg, *<span class="k">CSTRING</span> catName),<span class="k">SIGNED</span>,<span class="k">PASCAL</span>,<span class="k">RAW</span>,<span class="k">NAME</span>(<span class="s">'PG_AddCategory'</span>)
+PG_PollEvent   <span class="k">PROCEDURE</span>(<span class="k">LONG</span> pg, *<span class="k">SIGNED</span> row, *<span class="k">SIGNED</span> evType),<span class="k">SIGNED</span>,<span class="k">PASCAL</span>,<span class="k">RAW</span>,<span class="k">NAME</span>(<span class="s">'PG_PollEvent'</span>)
+    <span class="k">END</span>
+  <span class="k">END</span>
+  <span class="k">PRAGMA</span>(<span class="s">'link(propgrid.lib)'</span>)                <span class="c">! this is what links the import lib</span></pre>
+    <div class="callout danger"><b>The <code>MODULE()</code> label must not be <code>'PROPGRID.DLL'</code>.</b>
+      Clarion strips the extension, compares the result with the name of the module being compiled, decides
+      the prototypes are defined <i>there</i>, and every one fails with
+      <code>Missing procedure definition: PG_CREATE((LONG,...)</code>. The label is only a grouping name
+      &#8212; binding is by <code>NAME()</code> plus <code>propgrid.lib</code>.</div>
+    <p>The complete, working <code>MAP</code> for all 42 exports is the top of
+    <code>clarion\PropGrid.clw</code> &#8212; copy it rather than retyping it.</p>
+    <h3>C and C++</h3>
+    <p><code>#include "propgrid.h"</code> and link <code>propgrid.lib</code> from the MSVC build (the one in
+    <code>bin\</code>, not the Clarion one in <code>clarion\</code> &#8212; they are different formats).</p>
+    <h3>Anything else</h3>
+    <p>Declare the exports <code>stdcall</code> with ANSI strings. The types map as:
+    <code>HPG</code> = pointer-sized integer, <code>int</code> / <code>long</code> = 32-bit signed,
+    <code>COLORREF</code> = 32-bit unsigned, <code>double</code> = 64-bit IEEE, <code>HWND</code> /
+    <code>HPG</code> = 32-bit handle. Nothing is passed by value that is larger than 8 bytes, and no
+    structs cross the boundary at all.</p>
+  </div>
+  <div class="es">
+    <h3>Clarion</h3>
+    <p><code>PASCAL</code> por <code>__stdcall</code>, <code>NAME()</code> porque las exportaciones no están
+    decoradas, y <code>RAW</code> allí donde se pasa un puntero (un <code>*CSTRING</code> o un parámetro de
+    salida) para que Clarion mande sólo la dirección, sin la longitud detrás.</p>
+<pre>  <span class="k">MAP</span>
+    <span class="k">MODULE</span>(<span class="s">'ClaPropGridDLL'</span>)                <span class="c">! cualquier etiqueta MENOS 'PROPGRID.DLL'</span>
+PG_Create   <span class="k">PROCEDURE</span>(<span class="k">UNSIGNED</span> hwndParent, <span class="k">SIGNED</span> x, <span class="k">SIGNED</span> y, |
+                      <span class="k">SIGNED</span> w, <span class="k">SIGNED</span> h, <span class="k">ULONG</span> style),<span class="k">LONG</span>,<span class="k">PASCAL</span>,<span class="k">NAME</span>(<span class="s">'PG_Create'</span>)
+PG_AddCategory <span class="k">PROCEDURE</span>(<span class="k">LONG</span> pg, *<span class="k">CSTRING</span> catName),<span class="k">SIGNED</span>,<span class="k">PASCAL</span>,<span class="k">RAW</span>,<span class="k">NAME</span>(<span class="s">'PG_AddCategory'</span>)
+PG_PollEvent   <span class="k">PROCEDURE</span>(<span class="k">LONG</span> pg, *<span class="k">SIGNED</span> row, *<span class="k">SIGNED</span> evType),<span class="k">SIGNED</span>,<span class="k">PASCAL</span>,<span class="k">RAW</span>,<span class="k">NAME</span>(<span class="s">'PG_PollEvent'</span>)
+    <span class="k">END</span>
+  <span class="k">END</span>
+  <span class="k">PRAGMA</span>(<span class="s">'link(propgrid.lib)'</span>)                <span class="c">! esto es lo que enlaza la lib</span></pre>
+    <div class="callout danger"><b>La etiqueta de <code>MODULE()</code> no puede ser
+      <code>'PROPGRID.DLL'</code>.</b> Clarion quita la extensión, compara el resultado con el nombre del
+      módulo que está compilando, decide que los prototipos están definidos <i>ahí</i>, y todos fallan con
+      <code>Missing procedure definition: PG_CREATE((LONG,...)</code>. La etiqueta es sólo un nombre de
+      agrupación &#8212; el enlace es por <code>NAME()</code> más <code>propgrid.lib</code>.</div>
+    <p>El <code>MAP</code> completo y funcionando de las 42 exportaciones está al principio de
+    <code>clarion\PropGrid.clw</code> &#8212; cópielo en vez de reescribirlo.</p>
+    <h3>C y C++</h3>
+    <p><code>#include "propgrid.h"</code> y enlace <code>propgrid.lib</code> de la compilación MSVC (la de
+    <code>bin\</code>, no la de Clarion en <code>clarion\</code> &#8212; son formatos distintos).</p>
+    <h3>Cualquier otro</h3>
+    <p>Declare las exportaciones <code>stdcall</code> con cadenas ANSI. Los tipos se corresponden así:
+    <code>HPG</code> = entero del tamaño de un puntero, <code>int</code> / <code>long</code> = entero de 32
+    bits con signo, <code>COLORREF</code> = 32 bits sin signo, <code>double</code> = IEEE de 64 bits,
+    <code>HWND</code> / <code>HPG</code> = handle de 32 bits. Nada mayor de 8 bytes se pasa por valor, y
+    ninguna estructura cruza la frontera.</p>
+  </div>
+</section>
+
+<section id="state">
+  <h2><span class="en">Per-grid state</span><span class="es">Estado por rejilla</span></h2>
+  <div class="en">
+    <p class="lead">This is the closest thing the DLL has to properties: state held per <code>HPG</code>,
+    each with the call that changes it. Everything is readable from your own copy; only the ones with a
+    <code>PG_Get…</code> can be read back out of the grid.</p>
+    <table>
+      <tr><th>State</th><th>Default</th><th>Set with</th><th>Read with</th></tr>
+      <tr><td>Style flags</td><td>from <code>PG_Create</code></td><td>create only, not changeable
+        later</td><td>&#8212;</td></tr>
+      <tr><td>Position &amp; size</td><td>from <code>PG_Create</code></td><td><code>PG_SetPos</code></td>
+        <td>the window: <code>PG_GetHwnd</code> then <code>GetWindowRect</code></td></tr>
+      <tr><td>Splitter (name column width, px)</td><td><code>w * 2 / 5</code>, min 48</td>
+        <td><code>PG_SetSplitter</code></td><td><code>PG_GetSplitter</code></td></tr>
+      <tr><td>Row height (px)</td><td>0 = automatic</td><td><code>PG_SetRowHeight</code></td>
+        <td><code>PG_GetRowHeight</code> per row</td></tr>
+      <tr><td>Four font slots</td><td>Segoe UI 9, category bold</td><td><code>PG_SetFont</code></td>
+        <td><code>PG_GetFont</code></td></tr>
+      <tr><td>Extra fonts (ids 5+)</td><td>none</td><td><code>PG_AddFont</code></td>
+        <td><code>PG_GetFont</code>, <code>PG_GetFontCount</code></td></tr>
+      <tr><td>Eleven colour slots</td><td>see <a href="#consts">Constants</a></td>
+        <td><code>PG_SetColor</code></td><td>&#8212;</td></tr>
+      <tr><td>Rows</td><td>none</td><td><code>PG_AddProperty</code>, <code>PG_Clear</code></td>
+        <td><code>PG_GetRowCount</code>, <code>PG_FindRow</code></td></tr>
+      <tr><td>Categories</td><td>none</td><td><code>PG_AddCategory</code>, <code>PG_Clear</code></td>
+        <td><code>PG_FindCategory</code></td></tr>
+      <tr><td>Selected row</td><td>the first non-read-only row added</td><td>the user, or scrolling into
+        view</td><td><code>PG_GetSelected</code></td></tr>
+      <tr><td>Event callback</td><td>none</td><td><code>PG_SetCallback</code></td><td>&#8212;</td></tr>
+    </table>
+    <div class="callout note"><b>The style cannot be changed after create.</b> <code>PGS_DESCRIPTION</code>
+      in particular decides whether the description pane exists at all. Destroy and re-create to change
+      it.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Esto es lo más parecido a propiedades que tiene la DLL: estado guardado por
+    <code>HPG</code>, cada uno con la llamada que lo cambia. Todo es legible desde su propia copia; sólo lo
+    que tiene un <code>PG_Get…</code> se puede releer de la rejilla.</p>
+    <table>
+      <tr><th>Estado</th><th>Defecto</th><th>Se fija con</th><th>Se lee con</th></tr>
+      <tr><td>Banderas de estilo</td><td>de <code>PG_Create</code></td><td>sólo al crear, no se cambia
+        después</td><td>&#8212;</td></tr>
+      <tr><td>Posición y tamaño</td><td>de <code>PG_Create</code></td><td><code>PG_SetPos</code></td>
+        <td>la ventana: <code>PG_GetHwnd</code> y luego <code>GetWindowRect</code></td></tr>
+      <tr><td>Divisor (ancho de nombres, px)</td><td><code>w * 2 / 5</code>, mín. 48</td>
+        <td><code>PG_SetSplitter</code></td><td><code>PG_GetSplitter</code></td></tr>
+      <tr><td>Alto de fila (px)</td><td>0 = automático</td><td><code>PG_SetRowHeight</code></td>
+        <td><code>PG_GetRowHeight</code> por fila</td></tr>
+      <tr><td>Cuatro ranuras de fuente</td><td>Segoe UI 9, categoría en negrita</td>
+        <td><code>PG_SetFont</code></td><td><code>PG_GetFont</code></td></tr>
+      <tr><td>Fuentes extra (ids 5+)</td><td>ninguna</td><td><code>PG_AddFont</code></td>
+        <td><code>PG_GetFont</code>, <code>PG_GetFontCount</code></td></tr>
+      <tr><td>Once ranuras de color</td><td>vea <a href="#consts">Constantes</a></td>
+        <td><code>PG_SetColor</code></td><td>&#8212;</td></tr>
+      <tr><td>Filas</td><td>ninguna</td><td><code>PG_AddProperty</code>, <code>PG_Clear</code></td>
+        <td><code>PG_GetRowCount</code>, <code>PG_FindRow</code></td></tr>
+      <tr><td>Categorías</td><td>ninguna</td><td><code>PG_AddCategory</code>, <code>PG_Clear</code></td>
+        <td><code>PG_FindCategory</code></td></tr>
+      <tr><td>Fila seleccionada</td><td>la primera fila no de sólo lectura agregada</td><td>el usuario, o
+        al desplazarse</td><td><code>PG_GetSelected</code></td></tr>
+      <tr><td>Callback de eventos</td><td>ninguno</td><td><code>PG_SetCallback</code></td><td>&#8212;</td></tr>
+    </table>
+    <div class="callout note"><b>El estilo no se puede cambiar tras crear.</b> <code>PGS_DESCRIPTION</code>
+      en particular decide si el panel de descripción existe siquiera. Destruya y vuelva a crear para
+      cambiarlo.</div>
+  </div>
+</section>
+
+<section id="rowstate">
+  <h2><span class="en">Per-row / per-category state</span><span class="es">Estado por fila / categoría</span></h2>
+  <div class="en">
+    <p class="lead">Rows and categories are <b>1-based ids</b>, handed out by <code>PG_AddProperty</code>
+    and <code>PG_AddCategory</code> in creation order. Keep them; every per-item call takes one.</p>
+    <table>
+      <tr><th>Per-row state</th><th>Default</th><th>Set with</th><th>Read with</th></tr>
+      <tr><td>Category it belongs to</td><td>from <code>PG_AddProperty</code>; 0 = uncategorised</td>
+        <td>create only</td><td>&#8212;</td></tr>
+      <tr><td>Editor type</td><td>from <code>PG_AddProperty</code></td><td>create only</td><td>&#8212;</td></tr>
+      <tr><td>Display name</td><td>from <code>PG_AddProperty</code></td><td>create only</td>
+        <td><code>PG_FindRow</code> matches on it</td></tr>
+      <tr><td>Value</td><td>from <code>PG_AddProperty</code></td><td><code>PG_SetValue</code></td>
+        <td><code>PG_GetValue</code></td></tr>
+      <tr><td>Choices (Drop / Radio)</td><td>empty</td><td><code>PG_SetChoices</code></td><td>&#8212;</td></tr>
+      <tr><td>Range (Slider / Spin)</td><td>0, 0, 0</td><td><code>PG_SetRange</code></td><td>&#8212;</td></tr>
+      <tr><td>Description</td><td>empty</td><td><code>PG_SetDescription</code></td><td>&#8212;</td></tr>
+      <tr><td>Read-only</td><td>false</td><td><code>PG_SetReadOnly</code></td><td>&#8212;</td></tr>
+      <tr><td>Tag (a <code>long</code> of your own)</td><td>0</td><td><code>PG_SetTag</code></td>
+        <td><code>PG_GetTag</code></td></tr>
+      <tr><td>Name / value font ids</td><td>0 = inherit</td><td><code>PG_SetRowFont</code>,
+        <code>PG_SetRowFontFace</code></td><td><code>PG_GetRowFont</code></td></tr>
+      <tr><td>Wrap line count</td><td>0 = one line</td><td><code>PG_SetRowWrap</code></td>
+        <td><code>PG_GetRowWrap</code></td></tr>
+      <tr><td>Laid-out height</td><td>computed</td><td>&#8212;</td><td><code>PG_GetRowHeight</code></td></tr>
+    </table>
+    <table>
+      <tr><th>Per-category state</th><th>Default</th><th>Set with</th><th>Read with</th></tr>
+      <tr><td>Name</td><td>from <code>PG_AddCategory</code></td><td>create only</td>
+        <td><code>PG_FindCategory</code> matches on it</td></tr>
+      <tr><td>Expanded</td><td>true</td><td><code>PG_SetExpanded</code></td><td>&#8212;</td></tr>
+      <tr><td>Header / name / value font ids</td><td>0 = inherit</td><td><code>PG_SetCatFont</code>,
+        <code>PG_SetCatFontFace</code></td><td><code>PG_GetCatFont</code></td></tr>
+    </table>
+    <div class="callout warn"><b>Ids are positions, and <code>PG_Clear</code> resets them.</b> Row 3 is the
+      third row added since the last clear. There is no delete-one-row call &#8212; rebuild with
+      <code>PG_Clear</code> and add again, and re-read every id you kept.</div>
+    <div class="callout danger"><b><code>PG_AddCategory</code> does NOT merge by name.</b> Call it twice
+      with <code>"General"</code> and you get two headers both called General. The merge-by-name behaviour
+      belongs to <code>PropGridClass.AddCategory</code>, not to the DLL &#8212; at this level, call
+      <code>PG_FindCategory</code> first if you might already have that header.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Las filas y las categorías son <b>ids desde 1</b>, entregados por
+    <code>PG_AddProperty</code> y <code>PG_AddCategory</code> en orden de creación. Guárdelos; toda llamada
+    por elemento recibe uno.</p>
+    <table>
+      <tr><th>Estado por fila</th><th>Defecto</th><th>Se fija con</th><th>Se lee con</th></tr>
+      <tr><td>Categoría a la que pertenece</td><td>de <code>PG_AddProperty</code>; 0 = sin categoría</td>
+        <td>sólo al crear</td><td>&#8212;</td></tr>
+      <tr><td>Tipo de editor</td><td>de <code>PG_AddProperty</code></td><td>sólo al crear</td><td>&#8212;</td></tr>
+      <tr><td>Nombre visible</td><td>de <code>PG_AddProperty</code></td><td>sólo al crear</td>
+        <td><code>PG_FindRow</code> busca por él</td></tr>
+      <tr><td>Valor</td><td>de <code>PG_AddProperty</code></td><td><code>PG_SetValue</code></td>
+        <td><code>PG_GetValue</code></td></tr>
+      <tr><td>Opciones (Drop / Radio)</td><td>vacío</td><td><code>PG_SetChoices</code></td><td>&#8212;</td></tr>
+      <tr><td>Rango (Slider / Spin)</td><td>0, 0, 0</td><td><code>PG_SetRange</code></td><td>&#8212;</td></tr>
+      <tr><td>Descripción</td><td>vacía</td><td><code>PG_SetDescription</code></td><td>&#8212;</td></tr>
+      <tr><td>Sólo lectura</td><td>falso</td><td><code>PG_SetReadOnly</code></td><td>&#8212;</td></tr>
+      <tr><td>Tag (un <code>long</code> suyo)</td><td>0</td><td><code>PG_SetTag</code></td>
+        <td><code>PG_GetTag</code></td></tr>
+      <tr><td>Ids de fuente nombre / valor</td><td>0 = heredar</td><td><code>PG_SetRowFont</code>,
+        <code>PG_SetRowFontFace</code></td><td><code>PG_GetRowFont</code></td></tr>
+      <tr><td>Número de líneas de envoltura</td><td>0 = una línea</td><td><code>PG_SetRowWrap</code></td>
+        <td><code>PG_GetRowWrap</code></td></tr>
+      <tr><td>Alto maquetado</td><td>calculado</td><td>&#8212;</td><td><code>PG_GetRowHeight</code></td></tr>
+    </table>
+    <table>
+      <tr><th>Estado por categoría</th><th>Defecto</th><th>Se fija con</th><th>Se lee con</th></tr>
+      <tr><td>Nombre</td><td>de <code>PG_AddCategory</code></td><td>sólo al crear</td>
+        <td><code>PG_FindCategory</code> busca por él</td></tr>
+      <tr><td>Expandida</td><td>verdadero</td><td><code>PG_SetExpanded</code></td><td>&#8212;</td></tr>
+      <tr><td>Ids de fuente encabezado / nombre / valor</td><td>0 = heredar</td>
+        <td><code>PG_SetCatFont</code>, <code>PG_SetCatFontFace</code></td><td><code>PG_GetCatFont</code></td></tr>
+    </table>
+    <div class="callout warn"><b>Los ids son posiciones, y <code>PG_Clear</code> los reinicia.</b> La fila 3
+      es la tercera agregada desde la última limpieza. No hay llamada para borrar una sola fila &#8212;
+      reconstruya con <code>PG_Clear</code> y vuelva a agregar, releyendo cada id que guardó.</div>
+    <div class="callout danger"><b><code>PG_AddCategory</code> NO fusiona por nombre.</b> Llámela dos veces
+      con <code>"General"</code> y tendrá dos encabezados llamados General. La fusión por nombre es de
+      <code>PropGridClass.AddCategory</code>, no de la DLL &#8212; a este nivel, llame antes a
+      <code>PG_FindCategory</code> si puede que ya tenga ese encabezado.</div>
+  </div>
+</section>
+
+<section id="f-life">
+  <h2><span class="en">Functions — lifetime &amp; placement</span><span class="es">Funciones — vida y colocación</span></h2>
+  <div class="en">
+    <p class="lead">Every function takes the <code>HPG</code> first and returns quietly if it is
+    <code>NULL</code> or already destroyed &#8212; there is no error code to check on the setters.</p>
+    <table>
+      <tr><th>Signature</th><th>Returns / notes</th></tr>
+      <tr><td><code>int PG_Initialize(void)</code><br><span class="src">h:82 · cpp:1602</span></td>
+        <td>1 on success, 0 if the D2D/DWrite factories failed. Reference counted.</td></tr>
+      <tr><td><code>void PG_Shutdown(void)</code><br><span class="src">cpp:1624</span></td>
+        <td>Releases the factories when the count reaches zero.</td></tr>
+      <tr><td><code>HPG PG_Create(HWND parent, int x, int y, int w, int h, unsigned long style)</code><br><span class="src">cpp:1633</span></td>
+        <td>The handle, or <code>NULL</code>. Pixels. <code>style</code> = OR of <code>PGS_</code>.</td></tr>
+      <tr><td><code>void PG_Destroy(HPG pg)</code><br><span class="src">cpp:1683</span></td>
+        <td>Frees everything. The handle is dead afterwards.</td></tr>
+      <tr><td><code>void PG_SetPos(HPG pg, int x, int y, int w, int h)</code><br><span class="src">cpp:1706</span></td>
+        <td>Moves and resizes the child window. Closes any open editor first.</td></tr>
+      <tr><td><code>HWND PG_GetHwnd(HPG pg)</code><br><span class="src">cpp:1714</span></td>
+        <td>The grid's own window &#8212; for <code>GetWindowRect</code>, <code>SetFocus</code>, or
+        anything else you need a real HWND for.</td></tr>
+    </table>
+  </div>
+  <div class="es">
+    <p class="lead">Toda función recibe el <code>HPG</code> primero y vuelve en silencio si es
+    <code>NULL</code> o ya fue destruido &#8212; no hay código de error que comprobar en los setters.</p>
+    <table>
+      <tr><th>Firma</th><th>Devuelve / notas</th></tr>
+      <tr><td><code>int PG_Initialize(void)</code><br><span class="src">h:82 · cpp:1602</span></td>
+        <td>1 si tuvo éxito, 0 si fallaron las fábricas D2D/DWrite. Con conteo de referencias.</td></tr>
+      <tr><td><code>void PG_Shutdown(void)</code><br><span class="src">cpp:1624</span></td>
+        <td>Libera las fábricas cuando el contador llega a cero.</td></tr>
+      <tr><td><code>HPG PG_Create(HWND parent, int x, int y, int w, int h, unsigned long style)</code><br><span class="src">cpp:1633</span></td>
+        <td>El handle, o <code>NULL</code>. Píxeles. <code>style</code> = OR de <code>PGS_</code>.</td></tr>
+      <tr><td><code>void PG_Destroy(HPG pg)</code><br><span class="src">cpp:1683</span></td>
+        <td>Libera todo. El handle queda muerto.</td></tr>
+      <tr><td><code>void PG_SetPos(HPG pg, int x, int y, int w, int h)</code><br><span class="src">cpp:1706</span></td>
+        <td>Mueve y redimensiona la ventana hija. Cierra antes cualquier editor abierto.</td></tr>
+      <tr><td><code>HWND PG_GetHwnd(HPG pg)</code><br><span class="src">cpp:1714</span></td>
+        <td>La ventana propia de la rejilla &#8212; para <code>GetWindowRect</code>,
+        <code>SetFocus</code>, o lo que necesite un HWND real.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="f-look">
+  <h2><span class="en">Functions — appearance</span><span class="es">Funciones — apariencia</span></h2>
+  <div class="en">
+    <table>
+      <tr><th>Signature</th><th>Returns / notes</th></tr>
+      <tr><td><code>void PG_SetFont(HPG pg, int part, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1720</span></td>
+        <td><code>part</code> = a <code>PGF_</code> slot 1&#8211;4. A blank <code>face</code> or a
+        <code>sizePt</code> of 0 leaves that part alone. Row heights are recomputed.</td></tr>
+      <tr><td><code>void PG_SetColor(HPG pg, int slot, COLORREF color)</code><br><span class="src">cpp:1919</span></td>
+        <td><code>slot</code> = a <code>PGC_</code> value 1&#8211;11. <code>0x00BBGGRR</code>.</td></tr>
+      <tr><td><code>void PG_SetRowHeight(HPG pg, int px)</code><br><span class="src">cpp:1927</span></td>
+        <td>0 = automatic. Any other value pins every row to it, wrapped text included.</td></tr>
+      <tr><td><code>void PG_SetSplitter(HPG pg, int px)</code><br><span class="src">cpp:1935</span></td>
+        <td>Name-column width, floored at 48. The user can still drag it.</td></tr>
+      <tr><td><code>int PG_GetSplitter(HPG pg)</code><br><span class="src">cpp:1944</span></td>
+        <td>Where the splitter is now &#8212; including after the user dragged it.</td></tr>
+      <tr><td><code>void PG_Redraw(HPG pg)</code><br><span class="src">cpp:2139</span></td>
+        <td>Recomputes the scroll range and invalidates. Call once after a batch of changes rather than
+        after each one.</td></tr>
+    </table>
+  </div>
+  <div class="es">
+    <table>
+      <tr><th>Firma</th><th>Devuelve / notas</th></tr>
+      <tr><td><code>void PG_SetFont(HPG pg, int part, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1720</span></td>
+        <td><code>part</code> = una ranura <code>PGF_</code> 1&#8211;4. Una <code>face</code> vacía o un
+        <code>sizePt</code> 0 dejan esa parte como está. Se recalculan los altos de fila.</td></tr>
+      <tr><td><code>void PG_SetColor(HPG pg, int slot, COLORREF color)</code><br><span class="src">cpp:1919</span></td>
+        <td><code>slot</code> = un valor <code>PGC_</code> 1&#8211;11. <code>0x00BBGGRR</code>.</td></tr>
+      <tr><td><code>void PG_SetRowHeight(HPG pg, int px)</code><br><span class="src">cpp:1927</span></td>
+        <td>0 = automático. Cualquier otro valor fija todas las filas a él, texto envuelto incluido.</td></tr>
+      <tr><td><code>void PG_SetSplitter(HPG pg, int px)</code><br><span class="src">cpp:1935</span></td>
+        <td>Ancho de la columna de nombres, mínimo 48. El usuario puede seguir arrastrándolo.</td></tr>
+      <tr><td><code>int PG_GetSplitter(HPG pg)</code><br><span class="src">cpp:1944</span></td>
+        <td>Dónde está el divisor ahora &#8212; incluso después de que el usuario lo arrastre.</td></tr>
+      <tr><td><code>void PG_Redraw(HPG pg)</code><br><span class="src">cpp:2139</span></td>
+        <td>Recalcula el rango de scroll e invalida. Llámela una vez tras un lote de cambios y no después de
+        cada uno.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="f-font">
+  <h2><span class="en">Functions — fonts &amp; wrapping</span><span class="es">Funciones — fuentes y envoltura</span></h2>
+  <div class="en">
+    <p class="lead">New in v1.2. Font <b>ids</b> are the currency: 1&#8211;4 are the built-in
+    <code>PGF_</code> slots, 5 and up come from <code>PG_AddFont</code>, and 0 means "inherit".</p>
+    <table>
+      <tr><th>Signature</th><th>Returns / notes</th></tr>
+      <tr><td><code>int PG_AddFont(HPG pg, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1741</span></td>
+        <td>The new id (&#8805;5), or 0 on failure. <b>De-duplicated</b>: an identical font returns the id
+        it gave last time, so calling this per row is free. A blank face / 0 size inherits from the value
+        slot.</td></tr>
+      <tr><td><code>int PG_GetFontCount(HPG pg)</code><br><span class="src">cpp:1797</span></td>
+        <td>The highest valid font id.</td></tr>
+      <tr><td><code>int PG_GetFont(HPG pg, int fontId, char* faceBuf, int bufLen, int* sizePt, int* bold, int* italic)</code><br><span class="src">cpp:1803</span></td>
+        <td>1 on success, 0 for a bad id. Any out pointer may be <code>NULL</code>. Works on the four
+        built-in slots too.</td></tr>
+      <tr><td><code>void PG_SetCatFont(HPG pg, int cat, int hdrFont, int nameFont, int valueFont)</code><br><span class="src">cpp:1816</span></td>
+        <td>Applies to every row of that category. 0 on any argument = inherit the global slot.</td></tr>
+      <tr><td><code>int PG_GetCatFont(HPG pg, int cat, int* hdr, int* name, int* value)</code><br><span class="src">cpp:1828</span></td>
+        <td>1, or 0 for a bad category.</td></tr>
+      <tr><td><code>void PG_SetRowFont(HPG pg, int row, int nameFont, int valueFont)</code><br><span class="src">cpp:1840</span></td>
+        <td>Overrides the row's category.</td></tr>
+      <tr><td><code>int PG_GetRowFont(HPG pg, int row, int* name, int* value)</code><br><span class="src">cpp:1850</span></td>
+        <td>1, or 0 for a bad row.</td></tr>
+      <tr><td><code>int PG_SetRowFontFace(HPG pg, int row, int which, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1861</span></td>
+        <td>Register-and-assign in one call. <code>which</code> = <code>PGF_NAME</code> or
+        <code>PGF_VALUE</code>. Returns the font id used, 0 on error.</td></tr>
+      <tr><td><code>int PG_SetCatFontFace(HPG pg, int cat, int which, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1876</span></td>
+        <td>Same, plus <code>PGF_CATEGORY</code> for the header.</td></tr>
+      <tr><td><code>void PG_SetRowWrap(HPG pg, int row, int maxLines)</code><br><span class="src">cpp:1892</span></td>
+        <td>0 = one line + ellipsis. <i>n</i> = wrap over at most <i>n</i> lines. -1 = as many as needed
+        (capped at 64). The row grows and the rows below move down.</td></tr>
+      <tr><td><code>int PG_GetRowWrap(HPG pg, int row)</code><br><span class="src">cpp:1903</span></td>
+        <td>The setting, 0 when off.</td></tr>
+      <tr><td><code>int PG_GetRowHeight(HPG pg, int row)</code><br><span class="src">cpp:1910</span></td>
+        <td>The <b>laid-out</b> height in pixels, 0 when the row is not visible (a collapsed category, or a
+        bad id).</td></tr>
+    </table>
+    <div class="callout note"><b>Resolution order is row &#8594; category &#8594; global slot.</b> A row with
+      font 0 uses its category's; a category with 0 uses <code>PGF_NAME</code> / <code>PGF_VALUE</code> /
+      <code>PGF_CATEGORY</code>. An id that was never handed out is treated as 0.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Nuevo en v1.2. Los <b>ids</b> de fuente son la moneda: 1&#8211;4 son las ranuras
+    <code>PGF_</code>, de 5 en adelante vienen de <code>PG_AddFont</code>, y 0 significa "heredar".</p>
+    <table>
+      <tr><th>Firma</th><th>Devuelve / notas</th></tr>
+      <tr><td><code>int PG_AddFont(HPG pg, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1741</span></td>
+        <td>El nuevo id (&#8805;5), o 0 si falla. <b>Desduplicada</b>: una fuente idéntica devuelve el id que
+        ya dio, así que llamarla por fila sale gratis. Cara vacía / tamaño 0 heredan de la ranura de
+        valores.</td></tr>
+      <tr><td><code>int PG_GetFontCount(HPG pg)</code><br><span class="src">cpp:1797</span></td>
+        <td>El id de fuente válido más alto.</td></tr>
+      <tr><td><code>int PG_GetFont(HPG pg, int fontId, char* faceBuf, int bufLen, int* sizePt, int* bold, int* italic)</code><br><span class="src">cpp:1803</span></td>
+        <td>1 si va bien, 0 con un id malo. Cualquier puntero de salida puede ser <code>NULL</code>. Funciona
+        también con las cuatro ranuras.</td></tr>
+      <tr><td><code>void PG_SetCatFont(HPG pg, int cat, int hdrFont, int nameFont, int valueFont)</code><br><span class="src">cpp:1816</span></td>
+        <td>Se aplica a todas las filas de esa categoría. 0 en cualquier argumento = heredar la ranura
+        global.</td></tr>
+      <tr><td><code>int PG_GetCatFont(HPG pg, int cat, int* hdr, int* name, int* value)</code><br><span class="src">cpp:1828</span></td>
+        <td>1, o 0 con una categoría mala.</td></tr>
+      <tr><td><code>void PG_SetRowFont(HPG pg, int row, int nameFont, int valueFont)</code><br><span class="src">cpp:1840</span></td>
+        <td>Se impone a la categoría de la fila.</td></tr>
+      <tr><td><code>int PG_GetRowFont(HPG pg, int row, int* name, int* value)</code><br><span class="src">cpp:1850</span></td>
+        <td>1, o 0 con una fila mala.</td></tr>
+      <tr><td><code>int PG_SetRowFontFace(HPG pg, int row, int which, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1861</span></td>
+        <td>Registrar y asignar en una llamada. <code>which</code> = <code>PGF_NAME</code> o
+        <code>PGF_VALUE</code>. Devuelve el id usado, 0 si hay error.</td></tr>
+      <tr><td><code>int PG_SetCatFontFace(HPG pg, int cat, int which, const char* face, int sizePt, int bold, int italic)</code><br><span class="src">cpp:1876</span></td>
+        <td>Lo mismo, más <code>PGF_CATEGORY</code> para el encabezado.</td></tr>
+      <tr><td><code>void PG_SetRowWrap(HPG pg, int row, int maxLines)</code><br><span class="src">cpp:1892</span></td>
+        <td>0 = una línea con puntos suspensivos. <i>n</i> = envolver en como mucho <i>n</i> líneas. -1 = las
+        que hagan falta (tope 64). La fila crece y las de abajo bajan.</td></tr>
+      <tr><td><code>int PG_GetRowWrap(HPG pg, int row)</code><br><span class="src">cpp:1903</span></td>
+        <td>El ajuste, 0 si está apagado.</td></tr>
+      <tr><td><code>int PG_GetRowHeight(HPG pg, int row)</code><br><span class="src">cpp:1910</span></td>
+        <td>El alto <b>maquetado</b> en píxeles, 0 si la fila no está visible (categoría contraída, o id
+        malo).</td></tr>
+    </table>
+    <div class="callout note"><b>El orden de resolución es fila &#8594; categoría &#8594; ranura global.</b>
+      Una fila con fuente 0 usa la de su categoría; una categoría con 0 usa <code>PGF_NAME</code> /
+      <code>PGF_VALUE</code> / <code>PGF_CATEGORY</code>. Un id que nunca se entregó se trata como 0.</div>
+  </div>
+</section>
+
+<section id="f-build">
+  <h2><span class="en">Functions — building the grid</span><span class="es">Funciones — construir la rejilla</span></h2>
+  <div class="en">
+    <table>
+      <tr><th>Signature</th><th>Returns / notes</th></tr>
+      <tr><td><code>void PG_Clear(HPG pg)</code><br><span class="src">cpp:1950</span></td>
+        <td>Drops every row and category and resets the selection and scroll. <b>Keeps the fonts</b>, so ids
+        you were handed stay valid.</td></tr>
+      <tr><td><code>int PG_AddCategory(HPG pg, const char* name)</code><br><span class="src">cpp:1966</span></td>
+        <td>The new category id (1-based). <b>Always appends</b> &#8212; it does not merge by name.</td></tr>
+      <tr><td><code>int PG_FindCategory(HPG pg, const char* name)</code><br><span class="src">cpp:1781</span></td>
+        <td>An existing category's id, 0 if there is none. Case-insensitive. Never creates.</td></tr>
+      <tr><td><code>int PG_AddProperty(HPG pg, int category, const char* name, int type, const char* value)</code><br><span class="src">cpp:1983</span></td>
+        <td>The new row id (1-based). <code>category</code> 0 = uncategorised (drawn above the first
+        header). A <code>type</code> outside 1&#8211;13 falls back to <code>PGT_TEXT</code>. The first
+        non-read-only row added becomes the selection.</td></tr>
+      <tr><td><code>void PG_SetChoices(HPG pg, int row, const char* choices)</code><br><span class="src">cpp:2005</span></td>
+        <td>Pipe-delimited, e.g. <code>"Red|Green|Blue"</code>. For <code>PGT_DROP</code> and
+        <code>PGT_RADIO</code>.</td></tr>
+      <tr><td><code>void PG_SetRange(HPG pg, int row, double lo, double hi, double step)</code><br><span class="src">cpp:2015</span></td>
+        <td>For <code>PGT_SLIDER</code> and <code>PGT_SPIN</code>. Ignored while <code>hi &lt;= lo</code>;
+        a slider with no range behaves as 0&#8211;100.</td></tr>
+      <tr><td><code>void PG_SetDescription(HPG pg, int row, const char* text)</code><br><span class="src">cpp:2024</span></td>
+        <td>Shown in the description pane when the row is selected. Needs
+        <code>PGS_DESCRIPTION</code>.</td></tr>
+      <tr><td><code>void PG_SetReadOnly(HPG pg, int row, int readOnly)</code><br><span class="src">cpp:2034</span></td>
+        <td>A read-only row is drawn grey and refuses every editor.</td></tr>
+      <tr><td><code>void PG_SetExpanded(HPG pg, int category, int expanded)</code><br><span class="src">cpp:2043</span></td>
+        <td>Collapse or expand a header. Takes a <b>category</b> id.</td></tr>
+      <tr><td><code>void PG_SetTag(HPG pg, int row, long tag)</code><br><span class="src">cpp:2052</span></td>
+        <td>A <code>long</code> of your own, stored per row. The DLL never reads it &#8212; the Clarion
+        class keeps the source control's field equate here.</td></tr>
+      <tr><td><code>long PG_GetTag(HPG pg, int row)</code><br><span class="src">cpp:2059</span></td>
+        <td>What you put there, 0 if nothing.</td></tr>
+    </table>
+  </div>
+  <div class="es">
+    <table>
+      <tr><th>Firma</th><th>Devuelve / notas</th></tr>
+      <tr><td><code>void PG_Clear(HPG pg)</code><br><span class="src">cpp:1950</span></td>
+        <td>Quita todas las filas y categorías y reinicia selección y scroll. <b>Conserva las fuentes</b>,
+        así que los ids que le dieron siguen siendo válidos.</td></tr>
+      <tr><td><code>int PG_AddCategory(HPG pg, const char* name)</code><br><span class="src">cpp:1966</span></td>
+        <td>El nuevo id de categoría (desde 1). <b>Siempre agrega</b> &#8212; no fusiona por nombre.</td></tr>
+      <tr><td><code>int PG_FindCategory(HPG pg, const char* name)</code><br><span class="src">cpp:1781</span></td>
+        <td>El id de una categoría existente, 0 si no hay. Ignora mayúsculas. Nunca crea.</td></tr>
+      <tr><td><code>int PG_AddProperty(HPG pg, int category, const char* name, int type, const char* value)</code><br><span class="src">cpp:1983</span></td>
+        <td>El nuevo id de fila (desde 1). <code>category</code> 0 = sin categoría (se dibuja encima del
+        primer encabezado). Un <code>type</code> fuera de 1&#8211;13 cae a <code>PGT_TEXT</code>. La primera
+        fila no de sólo lectura pasa a estar seleccionada.</td></tr>
+      <tr><td><code>void PG_SetChoices(HPG pg, int row, const char* choices)</code><br><span class="src">cpp:2005</span></td>
+        <td>Separadas por pipes, p. ej. <code>"Red|Green|Blue"</code>. Para <code>PGT_DROP</code> y
+        <code>PGT_RADIO</code>.</td></tr>
+      <tr><td><code>void PG_SetRange(HPG pg, int row, double lo, double hi, double step)</code><br><span class="src">cpp:2015</span></td>
+        <td>Para <code>PGT_SLIDER</code> y <code>PGT_SPIN</code>. Se ignora mientras
+        <code>hi &lt;= lo</code>; un slider sin rango se comporta como 0&#8211;100.</td></tr>
+      <tr><td><code>void PG_SetDescription(HPG pg, int row, const char* text)</code><br><span class="src">cpp:2024</span></td>
+        <td>Se muestra en el panel de descripción con la fila seleccionada. Necesita
+        <code>PGS_DESCRIPTION</code>.</td></tr>
+      <tr><td><code>void PG_SetReadOnly(HPG pg, int row, int readOnly)</code><br><span class="src">cpp:2034</span></td>
+        <td>Una fila de sólo lectura se dibuja gris y rechaza todos los editores.</td></tr>
+      <tr><td><code>void PG_SetExpanded(HPG pg, int category, int expanded)</code><br><span class="src">cpp:2043</span></td>
+        <td>Contrae o expande un encabezado. Recibe un id de <b>categoría</b>.</td></tr>
+      <tr><td><code>void PG_SetTag(HPG pg, int row, long tag)</code><br><span class="src">cpp:2052</span></td>
+        <td>Un <code>long</code> suyo, guardado por fila. La DLL nunca lo lee &#8212; la clase Clarion
+        guarda aquí el field equate del control de origen.</td></tr>
+      <tr><td><code>long PG_GetTag(HPG pg, int row)</code><br><span class="src">cpp:2059</span></td>
+        <td>Lo que usted puso, 0 si nada.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="f-value">
+  <h2><span class="en">Functions — values</span><span class="es">Funciones — valores</span></h2>
+  <div class="en">
+    <table>
+      <tr><th>Signature</th><th>Returns / notes</th></tr>
+      <tr><td><code>void PG_SetValue(HPG pg, int row, const char* value)</code><br><span class="src">cpp:2066</span></td>
+        <td>Values are always <b>text</b>. If the row is being edited right now the editor is cancelled
+        first, so a background refresh cannot fight the user.</td></tr>
+      <tr><td><code>int PG_GetValue(HPG pg, int row, char* buf, int bufLen)</code><br><span class="src">cpp:2081</span></td>
+        <td>Characters copied, excluding the NUL. <b>If the row is open in an editor you get the editor's
+        current text</b>, not the committed value &#8212; so reading on OK does not need the user to tab
+        out first.</td></tr>
+      <tr><td><code>int PG_GetRowCount(HPG pg)</code><br><span class="src">cpp:2095</span></td>
+        <td>How many rows exist. Ids run 1..count.</td></tr>
+      <tr><td><code>int PG_FindRow(HPG pg, const char* name)</code><br><span class="src">cpp:2101</span></td>
+        <td>Row id by display name, 0 if absent. Case-insensitive, first match wins.</td></tr>
+      <tr><td><code>int PG_GetSelected(HPG pg)</code><br><span class="src">cpp:2116</span></td>
+        <td>The selected row id, 0 if none.</td></tr>
+    </table>
+    <table>
+      <tr><th>Editor type</th><th>What the value string holds</th></tr>
+      <tr><td><code>PGT_CHECK</code></td><td><code>"1"</code> or <code>"0"</code>. On read-back, a leading
+        <code>1</code>, <code>Y</code> or <code>T</code> counts as on.</td></tr>
+      <tr><td><code>PGT_DROP</code>, <code>PGT_RADIO</code></td><td>The chosen item's <b>text</b>, not its
+        index.</td></tr>
+      <tr><td><code>PGT_COLOR</code></td><td><code>"RRGGBB"</code> hex, optionally with a leading
+        <code>#</code>. Note this is <b>RGB order</b>, unlike <code>PG_SetColor</code>.</td></tr>
+      <tr><td><code>PGT_SLIDER</code>, <code>PGT_SPIN</code></td><td>A number as text, formatted with no
+        decimals when the step is &#8805;1.</td></tr>
+      <tr><td><code>PGT_DATE</code>, <code>PGT_TIME</code></td><td>Whatever text you put there &#8212; the
+        DLL does no date parsing. The Clarion class FORMATs and DEFORMATs around it.</td></tr>
+      <tr><td><code>PGT_BUTTON</code></td><td>The button's caption. Falls back to the row name when
+        empty.</td></tr>
+    </table>
+  </div>
+  <div class="es">
+    <table>
+      <tr><th>Firma</th><th>Devuelve / notas</th></tr>
+      <tr><td><code>void PG_SetValue(HPG pg, int row, const char* value)</code><br><span class="src">cpp:2066</span></td>
+        <td>Los valores son siempre <b>texto</b>. Si la fila se está editando en ese momento, el editor se
+        cancela primero, para que un refresco de fondo no pelee con el usuario.</td></tr>
+      <tr><td><code>int PG_GetValue(HPG pg, int row, char* buf, int bufLen)</code><br><span class="src">cpp:2081</span></td>
+        <td>Caracteres copiados, sin el NUL. <b>Si la fila está abierta en un editor obtiene el texto actual
+        del editor</b>, no el valor confirmado &#8212; así leer en OK no exige que el usuario salga del
+        campo primero.</td></tr>
+      <tr><td><code>int PG_GetRowCount(HPG pg)</code><br><span class="src">cpp:2095</span></td>
+        <td>Cuántas filas hay. Los ids van de 1 al total.</td></tr>
+      <tr><td><code>int PG_FindRow(HPG pg, const char* name)</code><br><span class="src">cpp:2101</span></td>
+        <td>Id de fila por nombre visible, 0 si no está. Ignora mayúsculas, gana la primera.</td></tr>
+      <tr><td><code>int PG_GetSelected(HPG pg)</code><br><span class="src">cpp:2116</span></td>
+        <td>El id de la fila seleccionada, 0 si ninguna.</td></tr>
+    </table>
+    <table>
+      <tr><th>Tipo de editor</th><th>Qué guarda la cadena de valor</th></tr>
+      <tr><td><code>PGT_CHECK</code></td><td><code>"1"</code> o <code>"0"</code>. Al releer, un
+        <code>1</code>, <code>Y</code> o <code>T</code> inicial cuenta como encendido.</td></tr>
+      <tr><td><code>PGT_DROP</code>, <code>PGT_RADIO</code></td><td>El <b>texto</b> del elegido, no su
+        índice.</td></tr>
+      <tr><td><code>PGT_COLOR</code></td><td>Hex <code>"RRGGBB"</code>, con <code>#</code> inicial opcional.
+        Ojo: esto va en <b>orden RGB</b>, al revés que <code>PG_SetColor</code>.</td></tr>
+      <tr><td><code>PGT_SLIDER</code>, <code>PGT_SPIN</code></td><td>Un número como texto, sin decimales
+        cuando el paso es &#8805;1.</td></tr>
+      <tr><td><code>PGT_DATE</code>, <code>PGT_TIME</code></td><td>El texto que usted ponga &#8212; la DLL no
+        interpreta fechas. La clase Clarion hace FORMAT y DEFORMAT alrededor.</td></tr>
+      <tr><td><code>PGT_BUTTON</code></td><td>El rótulo del botón. Si está vacío usa el nombre de la
+        fila.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="f-event">
+  <h2><span class="en">Functions — events</span><span class="es">Funciones — eventos</span></h2>
+  <div class="en">
+    <p class="lead">Two ways to hear about user activity, and you can use both. Neither one sends the parent
+    a window message.</p>
+    <div class="sig">int PG_PollEvent(HPG pg, int* row, int* evType)</div>
+    <p class="src">cpp:2122</p>
+    <p>Returns 1 and fills <code>row</code> / <code>evType</code> while the queue has anything in it, 0 when
+    it is empty. <b>Drain it in a loop</b> &#8212; one call takes one event. Drive it from a timer, or from
+    an idle handler.</p>
+<pre><span class="k">int</span> row, ev;
+<span class="k">while</span> (<span class="t">PG_PollEvent</span>(pg, &amp;row, &amp;ev)) {
+    <span class="k">switch</span> (ev) {
+    <span class="k">case</span> <span class="t">PGE_CHANGED</span>:  <span class="c">/* the user edited row */</span>      <span class="k">break</span>;
+    <span class="k">case</span> <span class="t">PGE_BUTTON</span>:   <span class="c">/* a PGT_BUTTON row was hit */</span> <span class="k">break</span>;
+    <span class="k">case</span> <span class="t">PGE_SELECT</span>:   <span class="c">/* selection moved */</span>          <span class="k">break</span>;
+    <span class="k">case</span> <span class="t">PGE_DBLCLICK</span>: <span class="c">/* row double-clicked */</span>      <span class="k">break</span>;
+    }
+}</pre>
+    <div class="sig">void PG_SetCallback(HPG pg, PG_EVENTPROC proc, long userData)</div>
+    <p class="src">cpp:2132</p>
+    <p>An immediate <code>__stdcall</code> callback, called <i>as the event happens</i> &#8212; on the UI
+    thread, inside the grid's window procedure:</p>
+<pre><span class="k">void</span> __stdcall MyEvents(<span class="k">long</span> userData, <span class="k">int</span> row, <span class="k">int</span> evType);
+<span class="t">PG_SetCallback</span>(pg, MyEvents, (<span class="k">long</span>)(<span class="k">void</span>*)myState);</pre>
+    <div class="callout warn"><b>The callback fires from inside the grid's own painting and input
+      handling.</b> Do not destroy the grid, open a modal dialog, or run a message loop from it. Set a flag
+      and act after you return. The poll queue has none of these constraints, which is why the Clarion class
+      uses it.</div>
+    <div class="callout note"><b>The queue holds 64 events.</b> When it is full the oldest are kept and the
+      newest is <b>dropped from the queue</b> &#8212; but the callback still fires for it. In practice 64 is
+      far more than a user can generate between two timer ticks; it only matters if you stop polling
+      entirely.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Dos formas de enterarse de lo que hace el usuario, y puede usar las dos. Ninguna manda un
+    mensaje de ventana al padre.</p>
+    <div class="sig">int PG_PollEvent(HPG pg, int* row, int* evType)</div>
+    <p class="src">cpp:2122</p>
+    <p>Devuelve 1 y rellena <code>row</code> / <code>evType</code> mientras la cola tenga algo, 0 cuando está
+    vacía. <b>Vacíela en un bucle</b> &#8212; una llamada saca un evento. Muévala desde un timer, o desde un
+    manejador de inactividad.</p>
+<pre><span class="k">int</span> row, ev;
+<span class="k">while</span> (<span class="t">PG_PollEvent</span>(pg, &amp;row, &amp;ev)) {
+    <span class="k">switch</span> (ev) {
+    <span class="k">case</span> <span class="t">PGE_CHANGED</span>:  <span class="c">/* el usuario editó la fila */</span>   <span class="k">break</span>;
+    <span class="k">case</span> <span class="t">PGE_BUTTON</span>:   <span class="c">/* se pulsó una fila botón */</span>  <span class="k">break</span>;
+    <span class="k">case</span> <span class="t">PGE_SELECT</span>:   <span class="c">/* cambió la selección */</span>      <span class="k">break</span>;
+    <span class="k">case</span> <span class="t">PGE_DBLCLICK</span>: <span class="c">/* doble clic en la fila */</span>    <span class="k">break</span>;
+    }
+}</pre>
+    <div class="sig">void PG_SetCallback(HPG pg, PG_EVENTPROC proc, long userData)</div>
+    <p class="src">cpp:2132</p>
+    <p>Un callback <code>__stdcall</code> inmediato, llamado <i>en el momento del evento</i> &#8212; en el
+    hilo de UI, dentro del procedimiento de ventana de la rejilla:</p>
+<pre><span class="k">void</span> __stdcall MyEvents(<span class="k">long</span> userData, <span class="k">int</span> row, <span class="k">int</span> evType);
+<span class="t">PG_SetCallback</span>(pg, MyEvents, (<span class="k">long</span>)(<span class="k">void</span>*)myState);</pre>
+    <div class="callout warn"><b>El callback se dispara desde dentro del pintado y la entrada de la
+      rejilla.</b> No destruya la rejilla, no abra un diálogo modal ni ejecute un bucle de mensajes desde
+      él. Ponga una bandera y actúe al volver. La cola de sondeo no tiene ninguna de estas restricciones,
+      y por eso la usa la clase Clarion.</div>
+    <div class="callout note"><b>La cola guarda 64 eventos.</b> Cuando se llena se conservan los más
+      antiguos y el nuevo <b>se descarta de la cola</b> &#8212; pero el callback sí se dispara con él. En la
+      práctica 64 es mucho más de lo que un usuario genera entre dos ticks; sólo importa si deja de sondear
+      del todo.</div>
+  </div>
+</section>
+
+<section id="consts">
+  <h2><span class="en">Every #define</span><span class="es">Cada #define</span></h2>
+  <div class="en">
+    <p class="lead">All of it from <code>src\propgrid.h</code>. The Clarion equivalents in
+    <code>PropGrid.inc</code> use a colon instead of an underscore — <code>PGT:Text</code> for
+    <code>PGT_TEXT</code> — and are otherwise identical.</p>
+    <h3>Editor types <span class="src">h:26</span></h3>
+    <table>
+      <tr><th>Constant</th><th class="ord">Value</th><th>Row</th></tr>
+      <tr><td><code>PGT_TEXT</code></td><td class="ord">1</td><td>Single-line type-in.</td></tr>
+      <tr><td><code>PGT_PASSWORD</code></td><td class="ord">2</td><td>Masked type-in.</td></tr>
+      <tr><td><code>PGT_DROP</code></td><td class="ord">3</td><td>Drop-down list; needs
+        <code>PG_SetChoices</code>.</td></tr>
+      <tr><td><code>PGT_CHECK</code></td><td class="ord">4</td><td>Checkbox; value <code>"1"</code>/<code>"0"</code>.</td></tr>
+      <tr><td><code>PGT_RADIO</code></td><td class="ord">5</td><td>Radio group; needs
+        <code>PG_SetChoices</code>.</td></tr>
+      <tr><td><code>PGT_SLIDER</code></td><td class="ord">6</td><td>Slider; needs
+        <code>PG_SetRange</code>.</td></tr>
+      <tr><td><code>PGT_SPIN</code></td><td class="ord">7</td><td>Numeric with up/down; needs
+        <code>PG_SetRange</code>.</td></tr>
+      <tr><td><code>PGT_BUTTON</code></td><td class="ord">8</td><td>Push button; raises
+        <code>PGE_BUTTON</code>.</td></tr>
+      <tr><td><code>PGT_COLOR</code></td><td class="ord">9</td><td>Swatch + the Windows colour picker;
+        value <code>"RRGGBB"</code>.</td></tr>
+      <tr><td><code>PGT_DATE</code></td><td class="ord">10</td><td>Date type-in; the value is text.</td></tr>
+      <tr><td><code>PGT_READONLY</code></td><td class="ord">11</td><td>Static display only.</td></tr>
+      <tr><td><code>PGT_TIME</code></td><td class="ord">12</td><td>Time type-in.</td></tr>
+      <tr><td><code>PGT_MULTITEXT</code></td><td class="ord">13</td><td>Text with a <code>"…"</code> popup
+        multiline editor.</td></tr>
+    </table>
+    <h3>Events, styles, font parts, docking <span class="src">h:41, 47, 53, 76</span></h3>
+    <table>
+      <tr><th>Constant</th><th class="ord">Value</th><th>Meaning</th></tr>
+      <tr><td><code>PGE_CHANGED</code></td><td class="ord">1</td><td>The user changed a row's value.</td></tr>
+      <tr><td><code>PGE_BUTTON</code></td><td class="ord">2</td><td>A <code>PGT_BUTTON</code> row was
+        clicked.</td></tr>
+      <tr><td><code>PGE_SELECT</code></td><td class="ord">3</td><td>The selection moved.</td></tr>
+      <tr><td><code>PGE_DBLCLICK</code></td><td class="ord">4</td><td>A row was double-clicked.</td></tr>
+      <tr><td><code>PGS_BORDER</code></td><td class="ord">0x0001</td><td>Thin border.</td></tr>
+      <tr><td><code>PGS_DESCRIPTION</code></td><td class="ord">0x0002</td><td>Description pane at the
+        bottom.</td></tr>
+      <tr><td><code>PGS_TOOLBOXLOOK</code></td><td class="ord">0x0004</td><td>Flat category headers.</td></tr>
+      <tr><td><code>PGS_SORT</code></td><td class="ord">0x0008</td><td>Sort rows alphabetically inside each
+        category.</td></tr>
+      <tr><td><code>PGF_INHERIT</code></td><td class="ord">0</td><td>"Fall through" &#8212; row to category,
+        category to slot.</td></tr>
+      <tr><td><code>PGF_NAME</code></td><td class="ord">1</td><td>Name column font slot.</td></tr>
+      <tr><td><code>PGF_VALUE</code></td><td class="ord">2</td><td>Value column font slot.</td></tr>
+      <tr><td><code>PGF_CATEGORY</code></td><td class="ord">3</td><td>Category header font slot.</td></tr>
+      <tr><td><code>PGF_DESC</code></td><td class="ord">4</td><td>Description pane font slot.</td></tr>
+      <tr><td><code>PGF_FIRSTEXTRA</code></td><td class="ord">5</td><td>First id <code>PG_AddFont</code>
+        hands out.</td></tr>
+      <tr><td><code>PGD_REGION</code> … <code>PGD_FIXED</code></td><td class="ord">0&#8211;4</td>
+        <td>Docking modes. <b>The DLL does not use these</b> &#8212; they exist for
+        <code>PropGridClass.Reposition</code>, which does the docking in Clarion.</td></tr>
+    </table>
+    <h3>Colour slots and their defaults <span class="src">h:64 · cpp:1655</span></h3>
+    <table>
+      <tr><th>Constant</th><th class="ord">Value</th><th>Default <code>0x00BBGGRR</code></th></tr>
+      <tr><td><code>PGC_BACK</code></td><td class="ord">1</td><td><span class="sw" style="background:#FFFFFF"></span><code>0x00FFFFFF</code> grid background</td></tr>
+      <tr><td><code>PGC_NAMEBACK</code></td><td class="ord">2</td><td><span class="sw" style="background:#F5F6F8"></span><code>0x00F8F6F5</code></td></tr>
+      <tr><td><code>PGC_NAMETEXT</code></td><td class="ord">3</td><td><span class="sw" style="background:#20252B"></span><code>0x002B2520</code></td></tr>
+      <tr><td><code>PGC_VALUETEXT</code></td><td class="ord">4</td><td><span class="sw" style="background:#20252B"></span><code>0x002B2520</code></td></tr>
+      <tr><td><code>PGC_CATBACK</code></td><td class="ord">5</td><td><span class="sw" style="background:#E4E9F0"></span><code>0x00F0E9E4</code></td></tr>
+      <tr><td><code>PGC_CATTEXT</code></td><td class="ord">6</td><td><span class="sw" style="background:#2C3A4F"></span><code>0x004F3A2C</code></td></tr>
+      <tr><td><code>PGC_LINES</code></td><td class="ord">7</td><td><span class="sw" style="background:#DDE1E6"></span><code>0x00E6E1DD</code></td></tr>
+      <tr><td><code>PGC_SELBACK</code></td><td class="ord">8</td><td><span class="sw" style="background:#D6E4F5"></span><code>0x00F5E4D6</code></td></tr>
+      <tr><td><code>PGC_SELTEXT</code></td><td class="ord">9</td><td><span class="sw" style="background:#141A21"></span><code>0x00211A14</code></td></tr>
+      <tr><td><code>PGC_DESCBACK</code></td><td class="ord">10</td><td><span class="sw" style="background:#F0F2F5"></span><code>0x00F5F2F0</code></td></tr>
+      <tr><td><code>PGC_DESCTEXT</code></td><td class="ord">11</td><td><span class="sw" style="background:#3A424C"></span><code>0x004C423A</code></td></tr>
+    </table>
+    <p class="src">The swatches show the real RGB. Remember the stored value reads backwards:
+    <code>0x00F0E9E4</code> is RGB <code>E4 E9 F0</code>.</p>
+  </div>
+  <div class="es">
+    <p class="lead">Todo de <code>src\propgrid.h</code>. Los equivalentes Clarion en
+    <code>PropGrid.inc</code> usan dos puntos en vez de guion bajo — <code>PGT:Text</code> por
+    <code>PGT_TEXT</code> — y por lo demás son idénticos.</p>
+    <h3>Tipos de editor <span class="src">h:26</span></h3>
+    <table>
+      <tr><th>Constante</th><th class="ord">Valor</th><th>Fila</th></tr>
+      <tr><td><code>PGT_TEXT</code></td><td class="ord">1</td><td>Escritura de una línea.</td></tr>
+      <tr><td><code>PGT_PASSWORD</code></td><td class="ord">2</td><td>Escritura enmascarada.</td></tr>
+      <tr><td><code>PGT_DROP</code></td><td class="ord">3</td><td>Lista desplegable; necesita
+        <code>PG_SetChoices</code>.</td></tr>
+      <tr><td><code>PGT_CHECK</code></td><td class="ord">4</td><td>Casilla; valor <code>"1"</code>/<code>"0"</code>.</td></tr>
+      <tr><td><code>PGT_RADIO</code></td><td class="ord">5</td><td>Grupo de opciones; necesita
+        <code>PG_SetChoices</code>.</td></tr>
+      <tr><td><code>PGT_SLIDER</code></td><td class="ord">6</td><td>Deslizador; necesita
+        <code>PG_SetRange</code>.</td></tr>
+      <tr><td><code>PGT_SPIN</code></td><td class="ord">7</td><td>Numérico con flechas; necesita
+        <code>PG_SetRange</code>.</td></tr>
+      <tr><td><code>PGT_BUTTON</code></td><td class="ord">8</td><td>Botón; levanta
+        <code>PGE_BUTTON</code>.</td></tr>
+      <tr><td><code>PGT_COLOR</code></td><td class="ord">9</td><td>Muestra + el selector de color de Windows;
+        valor <code>"RRGGBB"</code>.</td></tr>
+      <tr><td><code>PGT_DATE</code></td><td class="ord">10</td><td>Escritura de fecha; el valor es
+        texto.</td></tr>
+      <tr><td><code>PGT_READONLY</code></td><td class="ord">11</td><td>Sólo muestra.</td></tr>
+      <tr><td><code>PGT_TIME</code></td><td class="ord">12</td><td>Escritura de hora.</td></tr>
+      <tr><td><code>PGT_MULTITEXT</code></td><td class="ord">13</td><td>Texto con editor multilínea
+        emergente <code>"…"</code>.</td></tr>
+    </table>
+    <h3>Eventos, estilos, partes de fuente, acople <span class="src">h:41, 47, 53, 76</span></h3>
+    <table>
+      <tr><th>Constante</th><th class="ord">Valor</th><th>Significado</th></tr>
+      <tr><td><code>PGE_CHANGED</code></td><td class="ord">1</td><td>El usuario cambió el valor de una
+        fila.</td></tr>
+      <tr><td><code>PGE_BUTTON</code></td><td class="ord">2</td><td>Se pulsó una fila
+        <code>PGT_BUTTON</code>.</td></tr>
+      <tr><td><code>PGE_SELECT</code></td><td class="ord">3</td><td>Se movió la selección.</td></tr>
+      <tr><td><code>PGE_DBLCLICK</code></td><td class="ord">4</td><td>Doble clic en una fila.</td></tr>
+      <tr><td><code>PGS_BORDER</code></td><td class="ord">0x0001</td><td>Borde fino.</td></tr>
+      <tr><td><code>PGS_DESCRIPTION</code></td><td class="ord">0x0002</td><td>Panel de descripción
+        abajo.</td></tr>
+      <tr><td><code>PGS_TOOLBOXLOOK</code></td><td class="ord">0x0004</td><td>Encabezados planos.</td></tr>
+      <tr><td><code>PGS_SORT</code></td><td class="ord">0x0008</td><td>Ordenar filas alfabéticamente dentro
+        de cada categoría.</td></tr>
+      <tr><td><code>PGF_INHERIT</code></td><td class="ord">0</td><td>"Caer" &#8212; fila a categoría,
+        categoría a ranura.</td></tr>
+      <tr><td><code>PGF_NAME</code></td><td class="ord">1</td><td>Ranura de la columna de nombres.</td></tr>
+      <tr><td><code>PGF_VALUE</code></td><td class="ord">2</td><td>Ranura de la columna de valores.</td></tr>
+      <tr><td><code>PGF_CATEGORY</code></td><td class="ord">3</td><td>Ranura del encabezado.</td></tr>
+      <tr><td><code>PGF_DESC</code></td><td class="ord">4</td><td>Ranura del panel de descripción.</td></tr>
+      <tr><td><code>PGF_FIRSTEXTRA</code></td><td class="ord">5</td><td>Primer id que entrega
+        <code>PG_AddFont</code>.</td></tr>
+      <tr><td><code>PGD_REGION</code> … <code>PGD_FIXED</code></td><td class="ord">0&#8211;4</td>
+        <td>Modos de acople. <b>La DLL no los usa</b> &#8212; existen para
+        <code>PropGridClass.Reposition</code>, que hace el acople en Clarion.</td></tr>
+    </table>
+    <h3>Ranuras de color y sus valores por defecto <span class="src">h:64 · cpp:1655</span></h3>
+    <table>
+      <tr><th>Constante</th><th class="ord">Valor</th><th>Defecto <code>0x00BBGGRR</code></th></tr>
+      <tr><td><code>PGC_BACK</code></td><td class="ord">1</td><td><span class="sw" style="background:#FFFFFF"></span><code>0x00FFFFFF</code> fondo</td></tr>
+      <tr><td><code>PGC_NAMEBACK</code></td><td class="ord">2</td><td><span class="sw" style="background:#F5F6F8"></span><code>0x00F8F6F5</code></td></tr>
+      <tr><td><code>PGC_NAMETEXT</code></td><td class="ord">3</td><td><span class="sw" style="background:#20252B"></span><code>0x002B2520</code></td></tr>
+      <tr><td><code>PGC_VALUETEXT</code></td><td class="ord">4</td><td><span class="sw" style="background:#20252B"></span><code>0x002B2520</code></td></tr>
+      <tr><td><code>PGC_CATBACK</code></td><td class="ord">5</td><td><span class="sw" style="background:#E4E9F0"></span><code>0x00F0E9E4</code></td></tr>
+      <tr><td><code>PGC_CATTEXT</code></td><td class="ord">6</td><td><span class="sw" style="background:#2C3A4F"></span><code>0x004F3A2C</code></td></tr>
+      <tr><td><code>PGC_LINES</code></td><td class="ord">7</td><td><span class="sw" style="background:#DDE1E6"></span><code>0x00E6E1DD</code></td></tr>
+      <tr><td><code>PGC_SELBACK</code></td><td class="ord">8</td><td><span class="sw" style="background:#D6E4F5"></span><code>0x00F5E4D6</code></td></tr>
+      <tr><td><code>PGC_SELTEXT</code></td><td class="ord">9</td><td><span class="sw" style="background:#141A21"></span><code>0x00211A14</code></td></tr>
+      <tr><td><code>PGC_DESCBACK</code></td><td class="ord">10</td><td><span class="sw" style="background:#F0F2F5"></span><code>0x00F5F2F0</code></td></tr>
+      <tr><td><code>PGC_DESCTEXT</code></td><td class="ord">11</td><td><span class="sw" style="background:#3A424C"></span><code>0x004C423A</code></td></tr>
+    </table>
+    <p class="src">Las muestras enseñan el RGB real. Recuerde que el valor guardado se lee al revés:
+    <code>0x00F0E9E4</code> es RGB <code>E4 E9 F0</code>.</p>
+  </div>
+</section>
+
+<section id="ordinals">
+  <h2><span class="en">Export ordinals</span><span class="es">Ordinales de exportación</span></h2>
+  <div class="en">
+    <p class="lead">Pinned in <code>src\propgrid.def</code>. They are a <b>public contract</b>: new exports
+    are appended, none is ever renumbered or reused, because the Clarion import library binds by ordinal
+    rather than by name.</p>
+    <table>
+      <tr><th class="ord">#</th><th>Export</th><th class="ord">#</th><th>Export</th><th class="ord">#</th><th>Export</th></tr>
+      <tr><td class="ord">1</td><td><code>PG_Initialize</code></td><td class="ord">15</td><td><code>PG_SetChoices</code></td><td class="ord">29</td><td><code>PG_Redraw</code></td></tr>
+      <tr><td class="ord">2</td><td><code>PG_Shutdown</code></td><td class="ord">16</td><td><code>PG_SetRange</code></td><td class="ord">30</td><td><code>PG_AddFont</code></td></tr>
+      <tr><td class="ord">3</td><td><code>PG_Create</code></td><td class="ord">17</td><td><code>PG_SetDescription</code></td><td class="ord">31</td><td><code>PG_GetFontCount</code></td></tr>
+      <tr><td class="ord">4</td><td><code>PG_Destroy</code></td><td class="ord">18</td><td><code>PG_SetReadOnly</code></td><td class="ord">32</td><td><code>PG_GetFont</code></td></tr>
+      <tr><td class="ord">5</td><td><code>PG_SetPos</code></td><td class="ord">19</td><td><code>PG_SetExpanded</code></td><td class="ord">33</td><td><code>PG_SetCatFont</code></td></tr>
+      <tr><td class="ord">6</td><td><code>PG_GetHwnd</code></td><td class="ord">20</td><td><code>PG_SetTag</code></td><td class="ord">34</td><td><code>PG_GetCatFont</code></td></tr>
+      <tr><td class="ord">7</td><td><code>PG_SetFont</code></td><td class="ord">21</td><td><code>PG_GetTag</code></td><td class="ord">35</td><td><code>PG_SetRowFont</code></td></tr>
+      <tr><td class="ord">8</td><td><code>PG_SetColor</code></td><td class="ord">22</td><td><code>PG_SetValue</code></td><td class="ord">36</td><td><code>PG_GetRowFont</code></td></tr>
+      <tr><td class="ord">9</td><td><code>PG_SetRowHeight</code></td><td class="ord">23</td><td><code>PG_GetValue</code></td><td class="ord">37</td><td><code>PG_SetRowFontFace</code></td></tr>
+      <tr><td class="ord">10</td><td><code>PG_SetSplitter</code></td><td class="ord">24</td><td><code>PG_GetRowCount</code></td><td class="ord">38</td><td><code>PG_SetCatFontFace</code></td></tr>
+      <tr><td class="ord">11</td><td><code>PG_GetSplitter</code></td><td class="ord">25</td><td><code>PG_FindRow</code></td><td class="ord">39</td><td><code>PG_SetRowWrap</code></td></tr>
+      <tr><td class="ord">12</td><td><code>PG_Clear</code></td><td class="ord">26</td><td><code>PG_GetSelected</code></td><td class="ord">40</td><td><code>PG_GetRowWrap</code></td></tr>
+      <tr><td class="ord">13</td><td><code>PG_AddCategory</code></td><td class="ord">27</td><td><code>PG_PollEvent</code></td><td class="ord">41</td><td><code>PG_GetRowHeight</code></td></tr>
+      <tr><td class="ord">14</td><td><code>PG_AddProperty</code></td><td class="ord">28</td><td><code>PG_SetCallback</code></td><td class="ord">42</td><td><code>PG_FindCategory</code></td></tr>
+    </table>
+    <div class="callout danger"><b>A newer lib against an older DLL fails at load.</b> Because the binding
+      is by ordinal, an import library that knows about ordinal 30 will make the process die with
+      <i>"Entry Point Not Found: PG_AddFont"</i> if the DLL beside it only exports 1&#8211;29. Ship
+      <code>propgrid.lib</code> and <code>propgrid.dll</code> as a pair. The reverse &#8212; an old lib and
+      a new DLL &#8212; is always safe, which is the whole point of pinning them.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Fijados en <code>src\propgrid.def</code>. Son un <b>contrato público</b>: las nuevas
+    exportaciones se añaden al final, ninguna se renumera ni se reutiliza, porque la librería de importación
+    de Clarion enlaza por ordinal y no por nombre.</p>
+    <table>
+      <tr><th class="ord">#</th><th>Exportación</th><th class="ord">#</th><th>Exportación</th><th class="ord">#</th><th>Exportación</th></tr>
+      <tr><td class="ord">1</td><td><code>PG_Initialize</code></td><td class="ord">15</td><td><code>PG_SetChoices</code></td><td class="ord">29</td><td><code>PG_Redraw</code></td></tr>
+      <tr><td class="ord">2</td><td><code>PG_Shutdown</code></td><td class="ord">16</td><td><code>PG_SetRange</code></td><td class="ord">30</td><td><code>PG_AddFont</code></td></tr>
+      <tr><td class="ord">3</td><td><code>PG_Create</code></td><td class="ord">17</td><td><code>PG_SetDescription</code></td><td class="ord">31</td><td><code>PG_GetFontCount</code></td></tr>
+      <tr><td class="ord">4</td><td><code>PG_Destroy</code></td><td class="ord">18</td><td><code>PG_SetReadOnly</code></td><td class="ord">32</td><td><code>PG_GetFont</code></td></tr>
+      <tr><td class="ord">5</td><td><code>PG_SetPos</code></td><td class="ord">19</td><td><code>PG_SetExpanded</code></td><td class="ord">33</td><td><code>PG_SetCatFont</code></td></tr>
+      <tr><td class="ord">6</td><td><code>PG_GetHwnd</code></td><td class="ord">20</td><td><code>PG_SetTag</code></td><td class="ord">34</td><td><code>PG_GetCatFont</code></td></tr>
+      <tr><td class="ord">7</td><td><code>PG_SetFont</code></td><td class="ord">21</td><td><code>PG_GetTag</code></td><td class="ord">35</td><td><code>PG_SetRowFont</code></td></tr>
+      <tr><td class="ord">8</td><td><code>PG_SetColor</code></td><td class="ord">22</td><td><code>PG_SetValue</code></td><td class="ord">36</td><td><code>PG_GetRowFont</code></td></tr>
+      <tr><td class="ord">9</td><td><code>PG_SetRowHeight</code></td><td class="ord">23</td><td><code>PG_GetValue</code></td><td class="ord">37</td><td><code>PG_SetRowFontFace</code></td></tr>
+      <tr><td class="ord">10</td><td><code>PG_SetSplitter</code></td><td class="ord">24</td><td><code>PG_GetRowCount</code></td><td class="ord">38</td><td><code>PG_SetCatFontFace</code></td></tr>
+      <tr><td class="ord">11</td><td><code>PG_GetSplitter</code></td><td class="ord">25</td><td><code>PG_FindRow</code></td><td class="ord">39</td><td><code>PG_SetRowWrap</code></td></tr>
+      <tr><td class="ord">12</td><td><code>PG_Clear</code></td><td class="ord">26</td><td><code>PG_GetSelected</code></td><td class="ord">40</td><td><code>PG_GetRowWrap</code></td></tr>
+      <tr><td class="ord">13</td><td><code>PG_AddCategory</code></td><td class="ord">27</td><td><code>PG_PollEvent</code></td><td class="ord">41</td><td><code>PG_GetRowHeight</code></td></tr>
+      <tr><td class="ord">14</td><td><code>PG_AddProperty</code></td><td class="ord">28</td><td><code>PG_SetCallback</code></td><td class="ord">42</td><td><code>PG_FindCategory</code></td></tr>
+    </table>
+    <div class="callout danger"><b>Una lib nueva contra una DLL vieja falla al cargar.</b> Como el enlace es
+      por ordinal, una librería de importación que conoce el ordinal 30 hará que el proceso muera con
+      <i>"Entry Point Not Found: PG_AddFont"</i> si la DLL de al lado sólo exporta 1&#8211;29. Distribuya
+      <code>propgrid.lib</code> y <code>propgrid.dll</code> en pareja. Al revés &#8212; lib vieja y DLL
+      nueva &#8212; siempre es seguro, que es justo para lo que sirve fijarlos.</div>
+  </div>
+</section>
+
+<section id="limits">
+  <h2><span class="en">Threads, DPI, limits</span><span class="es">Hilos, DPI, límites</span></h2>
+  <div class="en">
+    <table>
+      <tr><th>Subject</th><th>Rule</th></tr>
+      <tr><td><b>Threads</b></td><td>The Direct2D factory is created
+        <code>D2D1_FACTORY_TYPE_SINGLE_THREADED</code>. Create, use and destroy a grid on <b>one thread</b>
+        &#8212; the one with the parent's message loop. There is no internal locking.</td></tr>
+      <tr><td><b>Grids per process</b></td><td>No limit. They share the factories and the window class
+        through <code>PG_Initialize</code>'s reference count.</td></tr>
+      <tr><td><b>DPI</b></td><td>Read once per grid at create with <code>GetDpiForWindow</code> (falling
+        back to the desktop DC). Point sizes scale by it. A grid does not re-read DPI if the window moves to
+        another monitor &#8212; destroy and re-create for that.</td></tr>
+      <tr><td><b>Rows / categories</b></td><td>Grow dynamically, no fixed ceiling. Both arrays double as
+        needed.</td></tr>
+      <tr><td><b>Event queue</b></td><td>64 entries, ring buffer. Full = the new event is dropped from the
+        queue, though the callback still fires.</td></tr>
+      <tr><td><b>Value length</b></td><td>The in-place editor reads up to 4096 characters;
+        <code>PG_GetValue</code> copies whatever fits your buffer.</td></tr>
+      <tr><td><b>Choices</b></td><td>Read into a 4096-character buffer, so a very long pipe list is
+        truncated.</td></tr>
+      <tr><td><b>Wrapped rows</b></td><td>Capped at 64 lines however long the text is, so one huge value
+        cannot swallow the grid.</td></tr>
+      <tr><td><b>Font table</b></td><td>Grows dynamically and is de-duplicated, so it stays small in
+        practice. Survives <code>PG_Clear</code>; freed only by <code>PG_Destroy</code>.</td></tr>
+    </table>
+  </div>
+  <div class="es">
+    <table>
+      <tr><th>Asunto</th><th>Regla</th></tr>
+      <tr><td><b>Hilos</b></td><td>La fábrica de Direct2D se crea
+        <code>D2D1_FACTORY_TYPE_SINGLE_THREADED</code>. Cree, use y destruya una rejilla en <b>un solo
+        hilo</b> &#8212; el del bucle de mensajes del padre. No hay bloqueo interno.</td></tr>
+      <tr><td><b>Rejillas por proceso</b></td><td>Sin límite. Comparten las fábricas y la clase de ventana
+        por el conteo de referencias de <code>PG_Initialize</code>.</td></tr>
+      <tr><td><b>DPI</b></td><td>Se lee una vez por rejilla al crear con <code>GetDpiForWindow</code> (con
+        respaldo al DC del escritorio). Los tamaños en puntos se escalan con él. Una rejilla no vuelve a
+        leer el DPI si la ventana pasa a otro monitor &#8212; destruya y vuelva a crear para eso.</td></tr>
+      <tr><td><b>Filas / categorías</b></td><td>Crecen dinámicamente, sin techo fijo. Ambos arreglos se
+        duplican según hace falta.</td></tr>
+      <tr><td><b>Cola de eventos</b></td><td>64 entradas, búfer circular. Llena = el evento nuevo se
+        descarta de la cola, aunque el callback sí se dispara.</td></tr>
+      <tr><td><b>Longitud de valor</b></td><td>El editor en el sitio lee hasta 4096 caracteres;
+        <code>PG_GetValue</code> copia lo que quepa en su buffer.</td></tr>
+      <tr><td><b>Opciones</b></td><td>Se leen en un buffer de 4096 caracteres, así que una lista con pipes
+        muy larga se trunca.</td></tr>
+      <tr><td><b>Filas envueltas</b></td><td>Tope de 64 líneas por largo que sea el texto, para que un valor
+        enorme no se trague la rejilla.</td></tr>
+      <tr><td><b>Tabla de fuentes</b></td><td>Crece dinámicamente y se desduplica, así que en la práctica
+        queda pequeña. Sobrevive a <code>PG_Clear</code>; sólo la libera
+        <code>PG_Destroy</code>.</td></tr>
+    </table>
+  </div>
+</section>
+
+<section id="example">
+  <h2><span class="en">A complete C host</span><span class="es">Un host C completo</span></h2>
+  <div class="en">
+    <p class="lead">Everything above, in one file. This is <code>src\testhost.c</code> in miniature: create a
+    plain Win32 window, put a grid on it, pump the events from a timer.</p>
+<pre><span class="c">#define WIN32_LEAN_AND_MEAN</span>
+<span class="c">#include &lt;windows.h&gt;</span>
+<span class="c">#include "propgrid.h"</span>
+
+<span class="k">static</span> <span class="t">HPG</span> g_pg;
+<span class="k">static</span> <span class="k">int</span> g_rName, g_rKind, g_rNote, g_rApply;
+
+<span class="k">static</span> <span class="t">LRESULT</span> <span class="t">CALLBACK</span> WndProc(<span class="t">HWND</span> h, <span class="t">UINT</span> m, <span class="t">WPARAM</span> w, <span class="t">LPARAM</span> l)
+{
+    <span class="k">switch</span> (m) {
+    <span class="k">case</span> WM_SIZE: {                          <span class="c">/* keep the grid on the client area */</span>
+        <span class="t">RECT</span> rc; GetClientRect(h, &amp;rc);
+        <span class="k">if</span> (g_pg) <span class="t">PG_SetPos</span>(g_pg, 8, 8, rc.right - 16, rc.bottom - 16);
+        <span class="k">return</span> 0;
+    }
+    <span class="k">case</span> WM_TIMER: {                         <span class="c">/* drain the event queue */</span>
+        <span class="k">int</span> row, ev; <span class="k">char</span> val[256];
+        <span class="k">while</span> (<span class="t">PG_PollEvent</span>(g_pg, &amp;row, &amp;ev)) {
+            <span class="k">if</span> (ev == <span class="t">PGE_BUTTON</span> &amp;&amp; row == g_rApply) {
+                <span class="t">PG_GetValue</span>(g_pg, g_rName, val, <span class="k">sizeof</span>(val));
+                MessageBoxA(h, val, <span class="s">"Apply"</span>, MB_OK);
+            }
+        }
+        <span class="k">return</span> 0;
+    }
+    <span class="k">case</span> WM_DESTROY: PostQuitMessage(0); <span class="k">return</span> 0;
+    }
+    <span class="k">return</span> DefWindowProcW(h, m, w, l);
+}
+
+<span class="k">int</span> <span class="t">WINAPI</span> WinMain(<span class="t">HINSTANCE</span> hi, <span class="t">HINSTANCE</span> hp, <span class="t">LPSTR</span> cmd, <span class="k">int</span> show)
+{
+    <span class="t">WNDCLASSW</span> wc = { 0 };
+    wc.lpfnWndProc   = WndProc;
+    wc.hInstance     = hi;
+    wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
+    wc.hbrBackground = (<span class="t">HBRUSH</span>)(COLOR_BTNFACE + 1);
+    wc.lpszClassName = L<span class="s">"PGHost"</span>;
+    RegisterClassW(&amp;wc);
+
+    <span class="t">HWND</span> h = CreateWindowExW(0, L<span class="s">"PGHost"</span>, L<span class="s">"PropGrid host"</span>,
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
+        460, 560, NULL, NULL, hi, NULL);
+
+    <span class="t">PG_Initialize</span>();
+    <span class="t">RECT</span> rc; GetClientRect(h, &amp;rc);
+    g_pg = <span class="t">PG_Create</span>(h, 8, 8, rc.right - 16, rc.bottom - 16,
+                      <span class="t">PGS_BORDER</span> | <span class="t">PGS_DESCRIPTION</span>);
+    <span class="k">if</span> (!g_pg) <span class="k">return</span> 1;
+
+    <span class="c">/* look */</span>
+    <span class="t">PG_SetFont</span>(g_pg, <span class="t">PGF_CATEGORY</span>, <span class="s">"Segoe UI"</span>, 9, 1, 0);
+    <span class="t">PG_SetSplitter</span>(g_pg, 150);
+
+    <span class="c">/* content */</span>
+    <span class="k">int</span> cGen = <span class="t">PG_AddCategory</span>(g_pg, <span class="s">"General"</span>);
+    g_rName = <span class="t">PG_AddProperty</span>(g_pg, cGen, <span class="s">"Name"</span>, <span class="t">PGT_TEXT</span>, <span class="s">"Widget Alpha"</span>);
+    <span class="t">PG_SetDescription</span>(g_pg, g_rName, <span class="s">"The display name."</span>);
+
+    g_rKind = <span class="t">PG_AddProperty</span>(g_pg, cGen, <span class="s">"Kind"</span>, <span class="t">PGT_DROP</span>, <span class="s">"Standard"</span>);
+    <span class="t">PG_SetChoices</span>(g_pg, g_rKind, <span class="s">"Standard|Advanced|Custom"</span>);
+
+    <span class="c">/* a value that wraps, and one row in its own font */</span>
+    g_rNote = <span class="t">PG_AddProperty</span>(g_pg, cGen, <span class="s">"Note"</span>, <span class="t">PGT_MULTITEXT</span>,
+        <span class="s">"A long note that is laid out over as many lines as it needs, "</span>
+        <span class="s">"growing the row and pushing everything below it down."</span>);
+    <span class="t">PG_SetRowWrap</span>(g_pg, g_rNote, -1);
+    <span class="t">PG_SetRowFontFace</span>(g_pg, g_rName, <span class="t">PGF_VALUE</span>, <span class="s">"Georgia"</span>, 12, 1, 0);
+
+    <span class="k">int</span> cAct = <span class="t">PG_AddCategory</span>(g_pg, <span class="s">"Actions"</span>);
+    g_rApply = <span class="t">PG_AddProperty</span>(g_pg, cAct, <span class="s">"Apply"</span>, <span class="t">PGT_BUTTON</span>, <span class="s">"Apply now"</span>);
+
+    <span class="t">PG_Redraw</span>(g_pg);
+    SetTimer(h, 1, 100, NULL);               <span class="c">/* the event pump */</span>
+
+    <span class="t">MSG</span> msg;
+    <span class="k">while</span> (GetMessageW(&amp;msg, NULL, 0, 0)) {
+        TranslateMessage(&amp;msg);
+        DispatchMessageW(&amp;msg);
+    }
+    <span class="t">PG_Destroy</span>(g_pg);
+    <span class="t">PG_Shutdown</span>();
+    <span class="k">return</span> 0;
+}</pre>
+    <p>Build it against the MSVC import library:</p>
+<pre>cl /nologo /MT host.c /Fehost.exe /link /SUBSYSTEM:WINDOWS ..\bin\propgrid.lib user32.lib</pre>
+    <div class="callout tip"><b>The shipped <code>src\testhost.c</code> is the fuller version</b> &#8212; it
+      exercises every editor type, per-category fonts and both wrap modes, and it builds as part of
+      <code>src\build.bat</code>. Read that when you want a working reference rather than a minimum.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Todo lo anterior, en un archivo. Es <code>src\testhost.c</code> en miniatura: crear una
+    ventana Win32 normal, poner una rejilla encima, bombear los eventos desde un timer.</p>
+<pre><span class="c">#define WIN32_LEAN_AND_MEAN</span>
+<span class="c">#include &lt;windows.h&gt;</span>
+<span class="c">#include "propgrid.h"</span>
+
+<span class="k">static</span> <span class="t">HPG</span> g_pg;
+<span class="k">static</span> <span class="k">int</span> g_rName, g_rKind, g_rNote, g_rApply;
+
+<span class="k">static</span> <span class="t">LRESULT</span> <span class="t">CALLBACK</span> WndProc(<span class="t">HWND</span> h, <span class="t">UINT</span> m, <span class="t">WPARAM</span> w, <span class="t">LPARAM</span> l)
+{
+    <span class="k">switch</span> (m) {
+    <span class="k">case</span> WM_SIZE: {                          <span class="c">/* mantener la rejilla en el área cliente */</span>
+        <span class="t">RECT</span> rc; GetClientRect(h, &amp;rc);
+        <span class="k">if</span> (g_pg) <span class="t">PG_SetPos</span>(g_pg, 8, 8, rc.right - 16, rc.bottom - 16);
+        <span class="k">return</span> 0;
+    }
+    <span class="k">case</span> WM_TIMER: {                         <span class="c">/* vaciar la cola de eventos */</span>
+        <span class="k">int</span> row, ev; <span class="k">char</span> val[256];
+        <span class="k">while</span> (<span class="t">PG_PollEvent</span>(g_pg, &amp;row, &amp;ev)) {
+            <span class="k">if</span> (ev == <span class="t">PGE_BUTTON</span> &amp;&amp; row == g_rApply) {
+                <span class="t">PG_GetValue</span>(g_pg, g_rName, val, <span class="k">sizeof</span>(val));
+                MessageBoxA(h, val, <span class="s">"Apply"</span>, MB_OK);
+            }
+        }
+        <span class="k">return</span> 0;
+    }
+    <span class="k">case</span> WM_DESTROY: PostQuitMessage(0); <span class="k">return</span> 0;
+    }
+    <span class="k">return</span> DefWindowProcW(h, m, w, l);
+}
+
+<span class="k">int</span> <span class="t">WINAPI</span> WinMain(<span class="t">HINSTANCE</span> hi, <span class="t">HINSTANCE</span> hp, <span class="t">LPSTR</span> cmd, <span class="k">int</span> show)
+{
+    <span class="t">WNDCLASSW</span> wc = { 0 };
+    wc.lpfnWndProc   = WndProc;
+    wc.hInstance     = hi;
+    wc.hCursor       = LoadCursorW(NULL, IDC_ARROW);
+    wc.hbrBackground = (<span class="t">HBRUSH</span>)(COLOR_BTNFACE + 1);
+    wc.lpszClassName = L<span class="s">"PGHost"</span>;
+    RegisterClassW(&amp;wc);
+
+    <span class="t">HWND</span> h = CreateWindowExW(0, L<span class="s">"PGHost"</span>, L<span class="s">"PropGrid host"</span>,
+        WS_OVERLAPPEDWINDOW | WS_VISIBLE, CW_USEDEFAULT, CW_USEDEFAULT,
+        460, 560, NULL, NULL, hi, NULL);
+
+    <span class="t">PG_Initialize</span>();
+    <span class="t">RECT</span> rc; GetClientRect(h, &amp;rc);
+    g_pg = <span class="t">PG_Create</span>(h, 8, 8, rc.right - 16, rc.bottom - 16,
+                      <span class="t">PGS_BORDER</span> | <span class="t">PGS_DESCRIPTION</span>);
+    <span class="k">if</span> (!g_pg) <span class="k">return</span> 1;
+
+    <span class="c">/* aspecto */</span>
+    <span class="t">PG_SetFont</span>(g_pg, <span class="t">PGF_CATEGORY</span>, <span class="s">"Segoe UI"</span>, 9, 1, 0);
+    <span class="t">PG_SetSplitter</span>(g_pg, 150);
+
+    <span class="c">/* contenido */</span>
+    <span class="k">int</span> cGen = <span class="t">PG_AddCategory</span>(g_pg, <span class="s">"General"</span>);
+    g_rName = <span class="t">PG_AddProperty</span>(g_pg, cGen, <span class="s">"Name"</span>, <span class="t">PGT_TEXT</span>, <span class="s">"Widget Alpha"</span>);
+    <span class="t">PG_SetDescription</span>(g_pg, g_rName, <span class="s">"El nombre visible."</span>);
+
+    g_rKind = <span class="t">PG_AddProperty</span>(g_pg, cGen, <span class="s">"Kind"</span>, <span class="t">PGT_DROP</span>, <span class="s">"Standard"</span>);
+    <span class="t">PG_SetChoices</span>(g_pg, g_rKind, <span class="s">"Standard|Advanced|Custom"</span>);
+
+    <span class="c">/* un valor que envuelve, y una fila con su propia fuente */</span>
+    g_rNote = <span class="t">PG_AddProperty</span>(g_pg, cGen, <span class="s">"Note"</span>, <span class="t">PGT_MULTITEXT</span>,
+        <span class="s">"Una nota larga que se reparte en tantas lineas como necesite, "</span>
+        <span class="s">"haciendo crecer la fila y empujando hacia abajo lo demas."</span>);
+    <span class="t">PG_SetRowWrap</span>(g_pg, g_rNote, -1);
+    <span class="t">PG_SetRowFontFace</span>(g_pg, g_rName, <span class="t">PGF_VALUE</span>, <span class="s">"Georgia"</span>, 12, 1, 0);
+
+    <span class="k">int</span> cAct = <span class="t">PG_AddCategory</span>(g_pg, <span class="s">"Actions"</span>);
+    g_rApply = <span class="t">PG_AddProperty</span>(g_pg, cAct, <span class="s">"Apply"</span>, <span class="t">PGT_BUTTON</span>, <span class="s">"Apply now"</span>);
+
+    <span class="t">PG_Redraw</span>(g_pg);
+    SetTimer(h, 1, 100, NULL);               <span class="c">/* la bomba de eventos */</span>
+
+    <span class="t">MSG</span> msg;
+    <span class="k">while</span> (GetMessageW(&amp;msg, NULL, 0, 0)) {
+        TranslateMessage(&amp;msg);
+        DispatchMessageW(&amp;msg);
+    }
+    <span class="t">PG_Destroy</span>(g_pg);
+    <span class="t">PG_Shutdown</span>();
+    <span class="k">return</span> 0;
+}</pre>
+    <p>Compílelo contra la librería de importación de MSVC:</p>
+<pre>cl /nologo /MT host.c /Fehost.exe /link /SUBSYSTEM:WINDOWS ..\bin\propgrid.lib user32.lib</pre>
+    <div class="callout tip"><b>El <code>src\testhost.c</code> entregado es la versión completa</b> &#8212;
+      ejercita todos los tipos de editor, las fuentes por categoría y los dos modos de envoltura, y se
+      compila con <code>src\build.bat</code>. Léalo cuando quiera una referencia funcionando y no un
+      mínimo.</div>
+  </div>
+</section>
+
+<section id="gotchas">
+  <h2><span class="en">Gotchas</span><span class="es">Trampas</span></h2>
+  <div class="en">
+    <table>
+      <tr><th>Symptom</th><th>Cause</th></tr>
+      <tr><td><code>Entry Point Not Found: PG_AddFont</code> (or any late export)</td><td>The loaded
+        <code>propgrid.dll</code> is older than the import library. Ship the pair.</td></tr>
+      <tr><td>Every virtual call crashes at a garbage address (Clarion)</td><td>The two mode defines
+        <code>_PropGridLinkMode_</code> / <code>_PropGridDllMode_</code> have no values, so the
+        <code>DLL()</code> attribute is undefined. They must arrive as project defines.</td></tr>
+      <tr><td><code>Missing procedure definition: PG_CREATE(...)</code></td><td>The Clarion
+        <code>MODULE()</code> label is <code>'PROPGRID.DLL'</code>. Use any other name.</td></tr>
+      <tr><td>The grid appears then vanishes behind other controls</td><td>A sibling native control is
+        painting over it. <code>PG_Create</code> pins the grid with <code>HWND_TOP</code>, but a control
+        created <i>later</i> can still land above it &#8212; create the grid last, or call
+        <code>SetWindowPos</code> yourself.</td></tr>
+      <tr><td>Two identical category headers</td><td><code>PG_AddCategory</code> appends unconditionally.
+        Call <code>PG_FindCategory</code> first.</td></tr>
+      <tr><td>Nothing happens when the user edits</td><td>Nothing is polling. The DLL never posts to the
+        parent &#8212; call <code>PG_PollEvent</code> from a timer or register a callback.</td></tr>
+      <tr><td>A slider ignores its range</td><td><code>PG_SetRange</code> was called with
+        <code>hi &lt;= lo</code>; the row falls back to 0&#8211;100.</td></tr>
+      <tr><td>The description pane never shows</td><td><code>PGS_DESCRIPTION</code> was not in the
+        <code>PG_Create</code> style, and the style cannot be changed afterwards.</td></tr>
+      <tr><td>Colours come out swapped</td><td><code>PG_SetColor</code> takes <code>0x00BBGGRR</code>, but a
+        <code>PGT_COLOR</code> row's <i>value</i> is <code>"RRGGBB"</code>. They really are opposite
+        orders.</td></tr>
+    </table>
+    <h3>See also</h3>
+    <ul>
+      <li><a href="ClaPropGrid-classes.html">ClaPropGrid — class guide</a>: <code>PropGridClass</code>, which
+        wraps every function on this page.</li>
+      <li><code>clarion\INSTALL.md</code> — installation, the templates and deployment.</li>
+      <li><code>src\propgrid.h</code> — the source of truth for this page.</li>
+    </ul>
+  </div>
+  <div class="es">
+    <table>
+      <tr><th>Síntoma</th><th>Causa</th></tr>
+      <tr><td><code>Entry Point Not Found: PG_AddFont</code> (o cualquier exportación tardía)</td><td>La
+        <code>propgrid.dll</code> cargada es más vieja que la librería de importación. Distribúyalas en
+        pareja.</td></tr>
+      <tr><td>Toda llamada virtual revienta en una dirección basura (Clarion)</td><td>Los dos defines
+        <code>_PropGridLinkMode_</code> / <code>_PropGridDllMode_</code> no tienen valor, así que el
+        atributo <code>DLL()</code> queda indefinido. Deben llegar como defines de proyecto.</td></tr>
+      <tr><td><code>Missing procedure definition: PG_CREATE(...)</code></td><td>La etiqueta
+        <code>MODULE()</code> de Clarion es <code>'PROPGRID.DLL'</code>. Use cualquier otro nombre.</td></tr>
+      <tr><td>La rejilla aparece y luego se esconde tras otros controles</td><td>Un control nativo hermano
+        la está pintando encima. <code>PG_Create</code> la fija con <code>HWND_TOP</code>, pero un control
+        creado <i>después</i> puede quedar por encima &#8212; cree la rejilla al final, o llame usted a
+        <code>SetWindowPos</code>.</td></tr>
+      <tr><td>Dos encabezados de categoría idénticos</td><td><code>PG_AddCategory</code> agrega sin
+        condiciones. Llame antes a <code>PG_FindCategory</code>.</td></tr>
+      <tr><td>No pasa nada cuando el usuario edita</td><td>Nadie está sondeando. La DLL nunca manda nada al
+        padre &#8212; llame a <code>PG_PollEvent</code> desde un timer o registre un callback.</td></tr>
+      <tr><td>Un slider ignora su rango</td><td>Se llamó a <code>PG_SetRange</code> con
+        <code>hi &lt;= lo</code>; la fila cae a 0&#8211;100.</td></tr>
+      <tr><td>El panel de descripción no aparece nunca</td><td><code>PGS_DESCRIPTION</code> no estaba en el
+        estilo de <code>PG_Create</code>, y el estilo no se puede cambiar después.</td></tr>
+      <tr><td>Los colores salen invertidos</td><td><code>PG_SetColor</code> recibe
+        <code>0x00BBGGRR</code>, pero el <i>valor</i> de una fila <code>PGT_COLOR</code> es
+        <code>"RRGGBB"</code>. De verdad son órdenes opuestos.</td></tr>
+    </table>
+    <h3>Vea también</h3>
+    <ul>
+      <li><a href="ClaPropGrid-classes.html">ClaPropGrid — guía de la clase</a>: <code>PropGridClass</code>,
+        que envuelve todo esto.</li>
+      <li><code>clarion\INSTALL.md</code> — instalación, plantillas y despliegue.</li>
+      <li><code>src\propgrid.h</code> — la fuente de la verdad de esta página.</li>
+    </ul>
+  </div>
+</section>
+
+    </div>
+    <footer>
+      <span class="en">ClaPropGrid v1.2 · DLL API · PROPGRID.DLL · Direct2D property grid for Clarion</span>
+      <span class="es">ClaPropGrid v1.2 · API de la DLL · PROPGRID.DLL · rejilla de propiedades Direct2D para Clarion</span>
+    </footer>
+  </main>
+</div>
+<script>
+  function setLang(l){
+    document.documentElement.setAttribute('data-lang', l);
+    document.getElementById('btn-en').classList.toggle('on', l==='en');
+    document.getElementById('btn-es').classList.toggle('on', l==='es');
+    try{ localStorage.setItem('cpg-lang', l); }catch(e){}
+  }
+  var saved='en';
+  try{ saved = localStorage.getItem('cpg-lang') || (navigator.language||'en').slice(0,2); }catch(e){}
+  setLang(saved==='es' ? 'es' : 'en');
+</script>
+</body>
+</html>

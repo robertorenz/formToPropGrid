@@ -91,15 +91,14 @@ you change `src\`.
 
 ## Developer reference
 
-`docs/ClaPropGrid-classes.html` — the class guide, bilingual EN/ES, in the
-same house style as the templatemaker docs: the three internal registry
-QUEUEs (`PropGridLookupQueue`, `PropGridTabQueue`, `PropGridCatQueue`) and
-their invariants, every property and method with `PropGrid.clw` line
-references, the equate tables, `BuildFromWindow` step by step, the sync
-round trip, four worked examples (a grid by hand, folding a lookup trio,
-converting a tabbed form, deriving the class), the measured Clarion
-runtime quirks the class is built around, and the template ↔ code map.
-Open it in a browser; it is a single self-contained file.
+Three bilingual (EN/ES) HTML guides in `docs/`, each a single self-contained
+file — open them in a browser.
+
+| Guide | For |
+|---|---|
+| [`ClaPropGrid-classes.html`](docs/ClaPropGrid-classes.html) | **The class guide.** How `PropGridClass` works: the three internal registry QUEUEs (`PropGridLookupQueue`, `PropGridTabQueue`, `PropGridCatQueue`) and their invariants, every property and method with `PropGrid.clw` line references, the equate tables, `BuildFromWindow` step by step, the sync round trip, four worked examples, the measured Clarion runtime quirks, and the template ↔ code map |
+| [`ClaPropGrid-cookbook.html`](docs/ClaPropGrid-cookbook.html) | **The cookbook.** The same 16 properties and 53 methods one at a time — what each is for and Clarion code you can paste, 128 snippets in all, plus an A–Z index. The page to keep open while writing |
+| [`ClaPropGrid-dll.html`](docs/ClaPropGrid-dll.html) | **The DLL API.** `PROPGRID.DLL` itself: calling convention, the `HPG` handle, the state a grid holds, all 42 exports, every `#define`, the pinned export ordinals, threading/DPI limits and a complete C host. For binding from outside Clarion |
 
 ## Repository layout
 
@@ -108,7 +107,7 @@ Open it in a browser; it is a single self-contained file.
 | `src/` | `propgrid.cpp/.h/.def` — the Direct2D engine; `testhost.c` — standalone visual test; `build.bat`; `make-clarion-lib.ps1` — generates the Clarion import lib (no LibMaker needed) |
 | `bin/` | `propgrid.dll` (32-bit), `testhost.exe`, MSVC import lib |
 | `clarion/` | `PropGrid.inc/.clw` — wrapper class (source, compiles in any Clarion version); `ClaPropGrid.tpl/.tpw` — the template chain; `propgrid.lib` — pre-built Clarion import lib (works in Clarion 9–12); `INSTALL.md` |
-| `docs/` | `ClaPropGrid-classes.html` — the class guide (EN/ES); `screenshot.png` |
+| `docs/` | `ClaPropGrid-classes.html` — class guide; `ClaPropGrid-cookbook.html` — every member with code; `ClaPropGrid-dll.html` — the flat C API (all EN/ES); `screenshot.png` |
 | `examples/` | `PropGridDemo/` — a hand-coded Clarion app exercising the whole class (three windows: every feature, a converted form, tabs) |
 
 The engine is C-style code compiled as C++ purely because the D2D/DWrite COM

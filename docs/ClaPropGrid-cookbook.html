@@ -1,0 +1,1416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClaPropGrid — Cookbook / Recetario</title>
+<style>
+  :root{
+    --blue:#0A66C2; --blue-d:#084d93; --navy:#0E1A2B; --navy-2:#16263c;
+    --ink:#22303f; --muted:#6b7785; --line:#e3e8ef; --bg:#f5f7fa;
+    --card:#ffffff; --green:#1e7c5a; --amber:#9a6a12; --amber-bg:#fff7e8;
+    --green-bg:#eef8f3; --blue-bg:#eef4fc; --red-bg:#fcecec; --red:#b23a2e;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;font:15px/1.65 -apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    color:var(--ink);background:var(--bg)}
+  a{color:var(--blue);text-decoration:none} a:hover{text-decoration:underline}
+  .wrap{display:flex;min-height:100vh}
+  nav{width:280px;flex:0 0 280px;background:linear-gradient(180deg,var(--navy),var(--navy-2));
+    color:#cdd8e6;position:sticky;top:0;height:100vh;overflow-y:auto;padding:22px 0}
+  nav .brand{padding:0 22px 16px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:10px}
+  nav .brand h1{font-size:16px;margin:0;color:#fff} nav .brand span{font-size:12px;color:#8aa0bb}
+  nav a{display:block;color:#b9c7d8;padding:6px 22px;font-size:13.5px;border-left:3px solid transparent}
+  nav a:hover{background:rgba(255,255,255,.05);color:#fff;text-decoration:none}
+  nav a.h2{padding-left:34px;font-size:13px;color:#9fb2c8}
+  nav .grp{font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6e85a1;
+    padding:14px 22px 4px;font-weight:700}
+  main{flex:1;min-width:0}
+  header.hero{background:linear-gradient(120deg,#0c2a4d,var(--blue));color:#fff;padding:46px 52px 30px}
+  header.hero h1{margin:0 0 6px;font-size:30px;letter-spacing:-.3px}
+  header.hero p{margin:0;font-size:15.5px;color:#dbe8f8;max-width:780px}
+  header.hero .pill{display:inline-block;margin-top:16px;background:rgba(255,255,255,.16);
+    padding:4px 12px;border-radius:20px;font-size:12.5px}
+  .langbar{display:flex;gap:8px;padding:14px 52px 0;background:var(--bg);position:sticky;top:0;z-index:20;
+    border-bottom:1px solid var(--line)}
+  .langbar button{cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:7px 16px;border-radius:8px 8px 0 0;font:600 13.5px/1 inherit;border-bottom:none}
+  .langbar button.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .body{padding:14px 52px 80px;max-width:940px}
+  section{padding:22px 0;border-bottom:1px solid var(--line);scroll-margin-top:50px} section:last-child{border-bottom:none}
+  h2{font-size:21px;margin:14px 0 10px;color:var(--navy);scroll-margin-top:50px}
+  h3{font-size:16px;margin:20px 0 6px;color:var(--blue-d)}
+  h4{font-size:14px;margin:16px 0 4px;color:var(--navy)}
+  p{margin:9px 0} ul,ol{margin:8px 0;padding-left:22px} li{margin:4px 0}
+  code,kbd,pre{font-family:"Cascadia Code",Consolas,monospace}
+  code{background:#eef1f5;padding:1px 6px;border-radius:4px;font-size:13px;color:#1d3b5e}
+  pre{background:#0f1d2e;color:#dbe6f2;padding:16px 18px;border-radius:10px;overflow:auto;
+    font-size:13px;line-height:1.55;margin:12px 0}
+  pre .c{color:#7fa6c9} pre .k{color:#79c0ff} pre .s{color:#7ee0b8} pre .t{color:#ffd591}
+  .callout{border-radius:8px;padding:12px 16px;margin:14px 0;font-size:14px;border:1px solid}
+  .tip{background:var(--green-bg);border-color:#bfe3d3;color:#155}
+  .note{background:var(--blue-bg);border-color:#c5dcf6;color:#13456f}
+  .warn{background:var(--amber-bg);border-color:#ecd9a6;color:#6f5210}
+  .danger{background:var(--red-bg);border-color:#f0c9c3;color:#7a2b20}
+  .callout b{display:block;margin-bottom:2px}
+  table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#f0f4f9;color:var(--navy);font-weight:600}
+  tr:hover td{background:#fafcff}
+  td code{white-space:nowrap}
+  .lead{font-size:16px;color:#3a4756}
+  .sig{background:#0f1d2e;color:#ffd591;padding:9px 14px;border-radius:8px;font-family:"Cascadia Code",Consolas,monospace;
+    font-size:13px;margin:18px 0 6px;overflow:auto}
+  .src{font-size:12px;color:var(--muted);font-family:"Cascadia Code",Consolas,monospace}
+  footer{padding:24px 52px;color:var(--muted);font-size:13px}
+  .sw{display:inline-block;width:14px;height:14px;border-radius:3px;vertical-align:-2px;margin-right:6px;border:1px solid rgba(0,0,0,.15)}
+  .use{font-size:13px;color:var(--muted);margin:2px 0 0}
+  html[data-lang="en"] .es{display:none}
+  html[data-lang="es"] .en{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav>
+    <div class="brand"><h1>ClaPropGrid</h1><span class="en">Cookbook · every member, with code · v1.2</span><span class="es">Recetario · cada miembro, con código · v1.2</span></div>
+    <a href="#how"><span class="en">How to read this</span><span class="es">Cómo leer esto</span></a>
+    <div class="grp"><span class="en">Properties</span><span class="es">Propiedades</span></div>
+    <a href="#p-config" class="h2"><span class="en">The ones you set</span><span class="es">Las que usted fija</span></a>
+    <a href="#p-read" class="h2"><span class="en">The ones you read</span><span class="es">Las que usted lee</span></a>
+    <a href="#p-internal" class="h2"><span class="en">The internal ones</span><span class="es">Las internas</span></a>
+    <div class="grp"><span class="en">Methods</span><span class="es">Métodos</span></div>
+    <a href="#m-life" class="h2"><span class="en">Lifetime &amp; placement</span><span class="es">Vida y colocación</span></a>
+    <a href="#m-look" class="h2"><span class="en">Appearance</span><span class="es">Apariencia</span></a>
+    <a href="#m-font" class="h2"><span class="en">Fonts</span><span class="es">Fuentes</span></a>
+    <a href="#m-wrap" class="h2"><span class="en">Wrapping &amp; height</span><span class="es">Envoltura y alto</span></a>
+    <a href="#m-cat" class="h2"><span class="en">Categories</span><span class="es">Categorías</span></a>
+    <a href="#m-row" class="h2"><span class="en">Rows</span><span class="es">Filas</span></a>
+    <a href="#m-val" class="h2"><span class="en">Values &amp; lookup</span><span class="es">Valores y búsqueda</span></a>
+    <a href="#m-form" class="h2"><span class="en">Form conversion</span><span class="es">Conversión de formulario</span></a>
+    <a href="#m-sync" class="h2"><span class="en">Syncing</span><span class="es">Sincronización</span></a>
+    <a href="#m-event" class="h2"><span class="en">Events</span><span class="es">Eventos</span></a>
+    <div class="grp"><span class="en">Reference</span><span class="es">Referencia</span></div>
+    <a href="#index" class="h2"><span class="en">A–Z index</span><span class="es">Índice A–Z</span></a>
+  </nav>
+  <main>
+    <header class="hero">
+      <h1><span class="en">PropGridClass, one member at a time</span><span class="es">PropGridClass, miembro a miembro</span></h1>
+      <p class="en">Every property and every public method, each with what it is for and Clarion code you can
+      paste. Where <a href="ClaPropGrid-classes.html">the class guide</a> explains how the class works, this
+      page is the lookup you keep open while writing: find the member, copy the four lines under it.</p>
+      <p class="es">Cada propiedad y cada método público, con para qué sirve y código Clarion que puede
+      pegar. Donde <a href="ClaPropGrid-classes.html">la guía de la clase</a> explica cómo funciona la clase,
+      esta página es la consulta que se deja abierta mientras se escribe: busque el miembro y copie las
+      cuatro líneas de debajo.</p>
+      <span class="pill">16 properties · 53 methods · every one with a snippet</span>
+    </header>
+
+    <div class="langbar">
+      <button id="btn-en" onclick="setLang('en')">English</button>
+      <button id="btn-es" onclick="setLang('es')">Español</button>
+    </div>
+
+    <div class="body">
+
+<section id="how">
+  <h2><span class="en">How to read this</span><span class="es">Cómo leer esto</span></h2>
+  <div class="en">
+    <p class="lead">Every snippet assumes these declarations, so they are not repeated:</p>
+<pre>Grid   PropGridClass            <span class="c">! or your own derived class</span>
+Cat    <span class="k">SIGNED</span>                   <span class="c">! a category id</span>
+Row    <span class="k">SIGNED</span>                   <span class="c">! a row id</span>
+Fnt    <span class="k">SIGNED</span>                   <span class="c">! a font id</span>
+Win    <span class="k">WINDOW</span>(<span class="s">'Demo'</span>),<span class="k">AT</span>(,,320,240),<span class="k">GRAY</span>,<span class="k">SYSTEM</span>,<span class="k">TIMER</span>(10)
+         <span class="k">REGION</span>,<span class="k">AT</span>(4,4,312,232),<span class="k">USE</span>(?PGRegion)
+       <span class="k">END</span></pre>
+    <table>
+      <tr><th>Convention</th><th>Meaning</th></tr>
+      <tr><td><code>,PROC</code> on a method</td><td>It returns something you are allowed to ignore, so it
+        can be called as a statement.</td></tr>
+      <tr><td><code>,VIRTUAL</code></td><td>You can override it in a derived class. Ten methods are.</td></tr>
+      <tr><td>A <code>*</code> parameter</td><td>Passed by reference — the method writes into your
+        variable.</td></tr>
+      <tr><td>Ids</td><td>Rows, categories and fonts are small positive integers. Keep the ones you will
+        need again; 0 always means "none" or "inherit".</td></tr>
+    </table>
+    <div class="callout note"><b>Nothing works before <code>Init</code>.</b> Every method starts with a
+      "is the grid alive?" check and returns quietly if it is not, so a call in the wrong place fails
+      silently rather than crashing. If a call seems to do nothing, check <code>Initialized</code>
+      first.</div>
+  </div>
+  <div class="es">
+    <p class="lead">Todos los fragmentos dan por hecho estas declaraciones, así que no se repiten:</p>
+<pre>Grid   PropGridClass            <span class="c">! o su propia clase derivada</span>
+Cat    <span class="k">SIGNED</span>                   <span class="c">! un id de categoría</span>
+Row    <span class="k">SIGNED</span>                   <span class="c">! un id de fila</span>
+Fnt    <span class="k">SIGNED</span>                   <span class="c">! un id de fuente</span>
+Win    <span class="k">WINDOW</span>(<span class="s">'Demo'</span>),<span class="k">AT</span>(,,320,240),<span class="k">GRAY</span>,<span class="k">SYSTEM</span>,<span class="k">TIMER</span>(10)
+         <span class="k">REGION</span>,<span class="k">AT</span>(4,4,312,232),<span class="k">USE</span>(?PGRegion)
+       <span class="k">END</span></pre>
+    <table>
+      <tr><th>Convención</th><th>Significado</th></tr>
+      <tr><td><code>,PROC</code> en un método</td><td>Devuelve algo que usted puede ignorar, así que se
+        puede llamar como sentencia.</td></tr>
+      <tr><td><code>,VIRTUAL</code></td><td>Se puede sobrescribir en una clase derivada. Diez métodos lo
+        son.</td></tr>
+      <tr><td>Un parámetro <code>*</code></td><td>Va por referencia — el método escribe en su
+        variable.</td></tr>
+      <tr><td>Ids</td><td>Filas, categorías y fuentes son enteros positivos pequeños. Guarde los que vaya a
+        volver a necesitar; 0 siempre significa "ninguno" o "heredar".</td></tr>
+    </table>
+    <div class="callout note"><b>Nada funciona antes de <code>Init</code>.</b> Todo método empieza con una
+      comprobación de "¿está viva la rejilla?" y vuelve en silencio si no lo está, así que una llamada en el
+      sitio equivocado falla sin ruido en vez de reventar. Si una llamada parece no hacer nada, mire primero
+      <code>Initialized</code>.</div>
+  </div>
+</section>
+
+<section id="p-config">
+  <h2><span class="en">Properties you set</span><span class="es">Propiedades que usted fija</span></h2>
+  <div class="en">
+    <p class="lead">Plain class fields — assign them directly. All of them are read at a particular moment,
+    so <b>when</b> you set them matters; each entry says when.</p>
+
+    <div class="sig">LiveSync   BYTE   ·   default 0</div>
+    <p class="use">Read by <code>TakeChanged</code>, on every edit.</p>
+    <p>1 = every keystroke that commits is pushed straight into the control's USE variable. 0 = nothing is
+    written until you call <code>SyncBack</code>.</p>
+<pre>Grid.LiveSync = 1                <span class="c">! edits land in the USE vars immediately</span>
+<span class="c">! with 0, call Grid.SyncBack() on your OK button instead</span></pre>
+
+    <div class="sig">HideOriginals   BYTE   ·   default 1</div>
+    <p class="use">Read by <code>BuildFromWindow</code>, as each row is created.</p>
+    <p>1 = a converted control and the PROMPT that labels it are hidden. 0 = the form stays visible with the
+    grid beside it, which is useful while you are checking the conversion.</p>
+<pre>Grid.HideOriginals = 0           <span class="c">! see both, side by side, while debugging</span>
+Grid.BuildFromWindow(Cat)</pre>
+
+    <div class="sig">TimerInterval   SIGNED   ·   default 10</div>
+    <p class="use">Read by <code>InitXY</code>, once.</p>
+    <p>Hundredths of a second. Applied to the window <b>only if it has no timer of its own</b>. 0 leaves the
+    window completely alone — then pumping <code>TakeEvent</code> is your job.</p>
+<pre>Grid.TimerInterval = 5           <span class="c">! 20 ticks a second, before Init</span>
+Grid.Init(Win, ?PGRegion)
+<span class="c">! Grid.TimerInterval = 0   ! do not touch the window's timer at all</span></pre>
+
+    <div class="sig">TabCategories   BYTE   ·   default 0</div>
+    <p class="use">Read by <code>BuildFromWindow</code>, per row.</p>
+    <p>1 = each TAB's own text becomes a category and its controls land under it. 0 = everything goes to the
+    category you passed in.</p>
+<pre>Grid.TabCategories = 1           <span class="c">! before BuildFromWindow</span>
+Grid.BuildFromWindow(Cat)        <span class="c">! Cat is now only the fallback</span></pre>
+
+    <div class="sig">MaxScanItems   SIGNED   ·   default 500</div>
+    <p class="use">Read whenever a queue-driven DROP is enumerated.</p>
+    <p>The cap on walking a LIST/COMBO's items to read its choices. Raise it for a long drop-down, lower it
+    if a huge list makes conversion slow.</p>
+<pre>Grid.MaxScanItems = 2000         <span class="c">! a long state/country drop-down</span></pre>
+
+    <div class="sig">DockMode  BYTE  ·  DockSize  SIGNED  ·  MarginX / MarginY  SIGNED</div>
+    <p class="use">Read by <code>Reposition</code>, every time.</p>
+    <p>Set them together with <code>SetDock</code> rather than by hand — see
+    <a href="#m-life"><code>SetDock</code></a>. Assigning them directly works and is occasionally handy:</p>
+<pre>Grid.DockMode = <span class="t">PGD:Right</span>          <span class="c">! same as SetDock(PGD:Right, 300, 4, 4)</span>
+Grid.DockSize = 300
+Grid.MarginX  = 4
+Grid.MarginY  = 4
+Grid.Reposition()</pre>
+
+    <div class="sig">Style   ULONG   ·   default PGS:Border + PGS:Description</div>
+    <p class="use">Read by <code>InitXY</code>, once.</p>
+    <p>Only what you pass to <code>Init</code> actually reaches the DLL; this field records it. Changing it
+    afterwards does nothing — destroy and re-init to change the style.</p>
+<pre>Grid.Init(Win, ?PGRegion, <span class="t">PGS:Border</span> + <span class="t">PGS:Sort</span>)   <span class="c">! no description pane</span></pre>
+  </div>
+  <div class="es">
+    <p class="lead">Campos de clase normales — asígnelos directamente. Todos se leen en un momento concreto,
+    así que <b>cuándo</b> los fija importa; cada entrada lo dice.</p>
+
+    <div class="sig">LiveSync   BYTE   ·   defecto 0</div>
+    <p class="use">Lo lee <code>TakeChanged</code>, en cada edición.</p>
+    <p>1 = cada edición confirmada se escribe de inmediato en la variable USE del control. 0 = no se escribe
+    nada hasta que usted llame a <code>SyncBack</code>.</p>
+<pre>Grid.LiveSync = 1                <span class="c">! las ediciones caen ya en las variables USE</span>
+<span class="c">! con 0, llame a Grid.SyncBack() en su botón OK</span></pre>
+
+    <div class="sig">HideOriginals   BYTE   ·   defecto 1</div>
+    <p class="use">Lo lee <code>BuildFromWindow</code>, al crear cada fila.</p>
+    <p>1 = el control convertido y el PROMPT que lo etiqueta se ocultan. 0 = el formulario sigue visible con
+    la rejilla al lado, útil mientras revisa la conversión.</p>
+<pre>Grid.HideOriginals = 0           <span class="c">! ver los dos, lado a lado, al depurar</span>
+Grid.BuildFromWindow(Cat)</pre>
+
+    <div class="sig">TimerInterval   SIGNED   ·   defecto 10</div>
+    <p class="use">Lo lee <code>InitXY</code>, una vez.</p>
+    <p>Centésimas de segundo. Se aplica a la ventana <b>sólo si no tiene timer propio</b>. 0 no toca la
+    ventana — entonces bombear <code>TakeEvent</code> es cosa suya.</p>
+<pre>Grid.TimerInterval = 5           <span class="c">! 20 ticks por segundo, antes de Init</span>
+Grid.Init(Win, ?PGRegion)
+<span class="c">! Grid.TimerInterval = 0   ! no tocar el timer de la ventana</span></pre>
+
+    <div class="sig">TabCategories   BYTE   ·   defecto 0</div>
+    <p class="use">Lo lee <code>BuildFromWindow</code>, por fila.</p>
+    <p>1 = el texto de cada TAB se vuelve categoría y sus controles caen debajo. 0 = todo va a la categoría
+    que usted pasó.</p>
+<pre>Grid.TabCategories = 1           <span class="c">! antes de BuildFromWindow</span>
+Grid.BuildFromWindow(Cat)        <span class="c">! Cat pasa a ser sólo el respaldo</span></pre>
+
+    <div class="sig">MaxScanItems   SIGNED   ·   defecto 500</div>
+    <p class="use">Se lee al enumerar un DROP servido por cola.</p>
+    <p>El tope al recorrer los elementos de un LIST/COMBO para leer sus opciones. Súbalo para un desplegable
+    largo, bájelo si una lista enorme hace lenta la conversión.</p>
+<pre>Grid.MaxScanItems = 2000         <span class="c">! un desplegable largo de estados/países</span></pre>
+
+    <div class="sig">DockMode  BYTE  ·  DockSize  SIGNED  ·  MarginX / MarginY  SIGNED</div>
+    <p class="use">Los lee <code>Reposition</code>, siempre.</p>
+    <p>Fíjelos juntos con <code>SetDock</code> y no a mano — vea
+    <a href="#m-life"><code>SetDock</code></a>. Asignarlos directamente funciona y a veces viene bien:</p>
+<pre>Grid.DockMode = <span class="t">PGD:Right</span>          <span class="c">! igual que SetDock(PGD:Right, 300, 4, 4)</span>
+Grid.DockSize = 300
+Grid.MarginX  = 4
+Grid.MarginY  = 4
+Grid.Reposition()</pre>
+
+    <div class="sig">Style   ULONG   ·   defecto PGS:Border + PGS:Description</div>
+    <p class="use">Lo lee <code>InitXY</code>, una vez.</p>
+    <p>Sólo lo que pasa a <code>Init</code> llega de verdad a la DLL; este campo lo registra. Cambiarlo
+    después no hace nada — destruya y vuelva a inicializar para cambiar el estilo.</p>
+<pre>Grid.Init(Win, ?PGRegion, <span class="t">PGS:Border</span> + <span class="t">PGS:Sort</span>)   <span class="c">! sin panel de descripción</span></pre>
+  </div>
+</section>
+
+<section id="p-read">
+  <h2><span class="en">Properties you read</span><span class="es">Propiedades que usted lee</span></h2>
+  <div class="en">
+    <div class="sig">Initialized   BYTE</div>
+    <p class="use">1 between a successful <code>Init</code> and <code>Kill</code>.</p>
+    <p>The one property worth testing routinely. The generated templates guard their whole build block with
+    it.</p>
+<pre><span class="k">IF</span> Grid.Init(Win, ?PGRegion)
+  <span class="c">! ... build the grid ...</span>
+<span class="k">END</span>
+<span class="c">! or later, from anywhere:</span>
+<span class="k">IF</span> Grid.Initialized
+  Grid.SetValue(Row, <span class="s">'safe to call'</span>)
+<span class="k">END</span></pre>
+
+    <div class="sig">Win   &amp;WINDOW</div>
+    <p class="use">The window <code>Init</code> was given, held by reference.</p>
+    <p>Useful in a derived method that needs the window without taking it as a parameter. Do not reassign
+    it.</p>
+<pre>MyGrid.TakeSelect <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">SETTARGET</span>(<span class="k">SELF</span>.Win)             <span class="c">! the owning window</span>
+  ?Status{<span class="t">PROP:Text</span>} = <span class="s">'Row '</span> &amp; row
+  <span class="k">SETTARGET</span>()</pre>
+
+    <div class="sig">RegionFeq   SIGNED</div>
+    <p class="use">The placeholder REGION <code>Init</code> was given; 0 after <code>InitXY</code>.</p>
+<pre><span class="k">IF</span> Grid.RegionFeq
+  <span class="k">UNHIDE</span>(Grid.RegionFeq)          <span class="c">! it is a real control on your window</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">PG   LONG</div>
+    <p class="use">The raw <code>HPG</code> handle; 0 = no grid.</p>
+    <p>Only needed if you want to call a DLL function the class does not wrap. Prefer
+    <code>Initialized</code> for "is it alive".</p>
+<pre><span class="k">IF</span> Grid.PG
+  PG_GetHwnd(Grid.PG)            <span class="c">! straight to the flat API</span>
+<span class="k">END</span></pre>
+  </div>
+  <div class="es">
+    <div class="sig">Initialized   BYTE</div>
+    <p class="use">1 entre un <code>Init</code> exitoso y <code>Kill</code>.</p>
+    <p>La única propiedad que conviene comprobar de rutina. Las plantillas generadas protegen con ella todo
+    su bloque de construcción.</p>
+<pre><span class="k">IF</span> Grid.Init(Win, ?PGRegion)
+  <span class="c">! ... construir la rejilla ...</span>
+<span class="k">END</span>
+<span class="c">! o después, desde donde sea:</span>
+<span class="k">IF</span> Grid.Initialized
+  Grid.SetValue(Row, <span class="s">'seguro de llamar'</span>)
+<span class="k">END</span></pre>
+
+    <div class="sig">Win   &amp;WINDOW</div>
+    <p class="use">La ventana que recibió <code>Init</code>, por referencia.</p>
+    <p>Útil en un método derivado que necesita la ventana sin recibirla como parámetro. No la
+    reasigne.</p>
+<pre>MyGrid.TakeSelect <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">SETTARGET</span>(<span class="k">SELF</span>.Win)             <span class="c">! la ventana dueña</span>
+  ?Status{<span class="t">PROP:Text</span>} = <span class="s">'Fila '</span> &amp; row
+  <span class="k">SETTARGET</span>()</pre>
+
+    <div class="sig">RegionFeq   SIGNED</div>
+    <p class="use">El REGION marcador que recibió <code>Init</code>; 0 tras <code>InitXY</code>.</p>
+<pre><span class="k">IF</span> Grid.RegionFeq
+  <span class="k">UNHIDE</span>(Grid.RegionFeq)          <span class="c">! es un control real de su ventana</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">PG   LONG</div>
+    <p class="use">El handle <code>HPG</code> crudo; 0 = sin rejilla.</p>
+    <p>Sólo hace falta si quiere llamar a una función de la DLL que la clase no envuelve. Para "¿está viva?"
+    use <code>Initialized</code>.</p>
+<pre><span class="k">IF</span> Grid.PG
+  PG_GetHwnd(Grid.PG)            <span class="c">! directo a la API plana</span>
+<span class="k">END</span></pre>
+  </div>
+</section>
+
+<section id="p-internal">
+  <h2><span class="en">The internal ones</span><span class="es">Las internas</span></h2>
+  <div class="en">
+    <p class="lead">These exist because the class needs them across calls. Read them if you are debugging;
+    write them only if you are extending the class and know why.</p>
+    <table>
+      <tr><th>Property</th><th>What it is for</th></tr>
+      <tr><td><code>NextPrompt   SIGNED</code></td><td>The label field equate feeding the <b>next</b>
+        <code>AddControl</code>. <code>BuildFromWindow</code> sets it as it walks; it clears itself after
+        one use. Set it yourself only if you call <code>AddControl</code> directly and want to name the row
+        from a PROMPT.</td></tr>
+      <tr><td><code>PendingSyncFrom   BYTE</code></td><td>A countdown. <code>TakeButton</code> sets it to 2
+        so that <code>SyncFrom</code> runs two <code>TakeEvent</code> calls later — after the POSTed button
+        handler, and any browse it opened, have finished writing. Set it to 2 yourself after anything else
+        that changes the form behind the grid's back.</td></tr>
+      <tr><td><code>Lookups</code>, <code>Tabs</code>, <code>CatNames</code></td><td><b>PRIVATE</b> queue
+        references — the lookup registry, the per-tab registry and the category-name registry. Not reachable
+        from outside the class; see the <a href="ClaPropGrid-classes.html#q-lookup">class guide</a> for what
+        they hold.</td></tr>
+    </table>
+<pre><span class="c">! you changed the form yourself - make the grid catch up</span>
+CUS:Code = <span class="s">'D04'</span>
+Grid.PendingSyncFrom = 2         <span class="c">! or just call Grid.SyncFrom() now</span></pre>
+  </div>
+  <div class="es">
+    <p class="lead">Existen porque la clase las necesita entre llamadas. Léalas si está depurando;
+    escríbalas sólo si está extendiendo la clase y sabe por qué.</p>
+    <table>
+      <tr><th>Propiedad</th><th>Para qué sirve</th></tr>
+      <tr><td><code>NextPrompt   SIGNED</code></td><td>El field equate de etiqueta que alimenta al
+        <b>siguiente</b> <code>AddControl</code>. <code>BuildFromWindow</code> lo pone mientras recorre; se
+        limpia solo tras un uso. Póngalo usted sólo si llama a <code>AddControl</code> directamente y quiere
+        nombrar la fila desde un PROMPT.</td></tr>
+      <tr><td><code>PendingSyncFrom   BYTE</code></td><td>Una cuenta atrás. <code>TakeButton</code> la pone
+        en 2 para que <code>SyncFrom</code> corra dos llamadas de <code>TakeEvent</code> después — cuando el
+        manejador del botón, y cualquier browse que abriera, ya escribieron. Póngala en 2 usted tras
+        cualquier otra cosa que cambie el formulario a espaldas de la rejilla.</td></tr>
+      <tr><td><code>Lookups</code>, <code>Tabs</code>, <code>CatNames</code></td><td>Referencias de cola
+        <b>PRIVADAS</b> — el registro de búsquedas, el de pestañas y el de nombres de categoría. No
+        accesibles desde fuera; vea la <a href="ClaPropGrid-classes.html#q-lookup">guía de la clase</a> para
+        saber qué guardan.</td></tr>
+    </table>
+<pre><span class="c">! usted cambió el formulario - que la rejilla se ponga al día</span>
+CUS:Code = <span class="s">'D04'</span>
+Grid.PendingSyncFrom = 2         <span class="c">! o llame ya a Grid.SyncFrom()</span></pre>
+  </div>
+</section>
+
+<section id="m-life">
+  <h2><span class="en">Lifetime &amp; placement</span><span class="es">Vida y colocación</span></h2>
+  <div class="en">
+    <div class="sig">Init PROCEDURE(WINDOW W, SIGNED regionFeq, ULONG style=3), BYTE, PROC, VIRTUAL</div>
+    <p class="use">Create the grid over a REGION control. Returns 1 on success.</p>
+<pre><span class="k">IF</span> Grid.Init(Win, ?PGRegion, <span class="t">PGS:Border</span> + <span class="t">PGS:Description</span>)
+  <span class="c">! the grid now tracks ?PGRegion on every resize</span>
+<span class="k">ELSE</span>
+  <span class="k">MESSAGE</span>(<span class="s">'PROPGRID.DLL did not create the grid.'</span>)
+<span class="k">END</span></pre>
+
+    <div class="sig">InitXY PROCEDURE(WINDOW W, SIGNED x, y, width, height, ULONG style=3), BYTE, PROC, VIRTUAL</div>
+    <p class="use">Create it at fixed pixel coordinates instead, with no REGION.</p>
+<pre>Grid.InitXY(Win, 4, 4, 300, 400, <span class="t">PGS:Border</span>)
+Grid.SetDock(<span class="t">PGD:Right</span>, 300, 4, 4)   <span class="c">! then tell it how to follow a resize</span></pre>
+
+    <div class="sig">Kill PROCEDURE(), VIRTUAL</div>
+    <p class="use">Destroy the grid. Idempotent — calling it twice is harmless.</p>
+<pre>Grid.Kill()
+<span class="k">CLOSE</span>(Win)</pre>
+
+    <div class="sig">SetDock PROCEDURE(BYTE mode, SIGNED size=0, marginX=0, marginY=0)</div>
+    <p class="use">Decide what <code>Reposition</code> does. Only needed after <code>InitXY</code> —
+    <code>Init</code> sets <code>PGD:Region</code> for you.</p>
+<pre>Grid.SetDock(<span class="t">PGD:Right</span>, 300, 4, 4)   <span class="c">! 300px down the right edge</span>
+Grid.SetDock(<span class="t">PGD:Fill</span>, 0, 8, 8)      <span class="c">! whole client area, 8px inset</span>
+Grid.SetDock(<span class="t">PGD:Fixed</span>)               <span class="c">! never move it again</span></pre>
+
+    <div class="sig">SetPos PROCEDURE(SIGNED x, y, width, height)</div>
+    <p class="use">Move it now, in pixels, ignoring the dock mode.</p>
+<pre>Grid.SetPos(4, 4, 320, 500)      <span class="c">! absolute, right now</span></pre>
+
+    <div class="sig">Reposition PROCEDURE(), VIRTUAL</div>
+    <p class="use">Re-apply the dock / re-track the REGION. Call it from <code>EVENT:Sized</code>.</p>
+<pre><span class="k">OF</span> <span class="t">EVENT:Sized</span>
+  Grid.Reposition()</pre>
+    <div class="callout warn"><b>In an ABC window, POST a private event first.</b> At the top of
+      <code>TakeWindowEvent</code> the ABC resizer has not moved the REGION yet, so its width is still the
+      old one. That is why the templates do
+      <code>OF EVENT:Sized ; POST(PGResize:Obj)</code> and reposition when <i>that</i> arrives.</div>
+
+    <div class="sig">Construct / Destruct   PROCEDURE()</div>
+    <p class="use">Called by Clarion, never by you.</p>
+    <p><code>Construct</code> sets the factory defaults and NEWs the three registries; <code>Destruct</code>
+    kills the grid if you forgot and disposes them. Worth knowing they exist so you do not double-free.</p>
+  </div>
+  <div class="es">
+    <div class="sig">Init PROCEDURE(WINDOW W, SIGNED regionFeq, ULONG style=3), BYTE, PROC, VIRTUAL</div>
+    <p class="use">Crear la rejilla sobre un control REGION. Devuelve 1 si va bien.</p>
+<pre><span class="k">IF</span> Grid.Init(Win, ?PGRegion, <span class="t">PGS:Border</span> + <span class="t">PGS:Description</span>)
+  <span class="c">! la rejilla ya sigue a ?PGRegion en cada redimensión</span>
+<span class="k">ELSE</span>
+  <span class="k">MESSAGE</span>(<span class="s">'PROPGRID.DLL no creó la rejilla.'</span>)
+<span class="k">END</span></pre>
+
+    <div class="sig">InitXY PROCEDURE(WINDOW W, SIGNED x, y, width, height, ULONG style=3), BYTE, PROC, VIRTUAL</div>
+    <p class="use">Crearla en coordenadas fijas de píxeles, sin REGION.</p>
+<pre>Grid.InitXY(Win, 4, 4, 300, 400, <span class="t">PGS:Border</span>)
+Grid.SetDock(<span class="t">PGD:Right</span>, 300, 4, 4)   <span class="c">! y dígale cómo seguir una redimensión</span></pre>
+
+    <div class="sig">Kill PROCEDURE(), VIRTUAL</div>
+    <p class="use">Destruir la rejilla. Idempotente — llamarlo dos veces es inofensivo.</p>
+<pre>Grid.Kill()
+<span class="k">CLOSE</span>(Win)</pre>
+
+    <div class="sig">SetDock PROCEDURE(BYTE mode, SIGNED size=0, marginX=0, marginY=0)</div>
+    <p class="use">Decidir qué hace <code>Reposition</code>. Sólo hace falta tras <code>InitXY</code> —
+    <code>Init</code> pone <code>PGD:Region</code> por usted.</p>
+<pre>Grid.SetDock(<span class="t">PGD:Right</span>, 300, 4, 4)   <span class="c">! 300px por el borde derecho</span>
+Grid.SetDock(<span class="t">PGD:Fill</span>, 0, 8, 8)      <span class="c">! toda el área cliente, 8px de margen</span>
+Grid.SetDock(<span class="t">PGD:Fixed</span>)               <span class="c">! que no se mueva más</span></pre>
+
+    <div class="sig">SetPos PROCEDURE(SIGNED x, y, width, height)</div>
+    <p class="use">Moverla ya, en píxeles, ignorando el modo de acople.</p>
+<pre>Grid.SetPos(4, 4, 320, 500)      <span class="c">! absoluto, ahora mismo</span></pre>
+
+    <div class="sig">Reposition PROCEDURE(), VIRTUAL</div>
+    <p class="use">Reaplicar el acople / volver a seguir al REGION. Llámelo desde
+    <code>EVENT:Sized</code>.</p>
+<pre><span class="k">OF</span> <span class="t">EVENT:Sized</span>
+  Grid.Reposition()</pre>
+    <div class="callout warn"><b>En una ventana ABC, haga POST de un evento privado primero.</b> Al
+      principio de <code>TakeWindowEvent</code> el redimensionador de ABC todavía no movió el REGION, así
+      que su ancho sigue siendo el viejo. Por eso las plantillas hacen
+      <code>OF EVENT:Sized ; POST(PGResize:Obj)</code> y recolocan cuando llega <i>ese</i>.</div>
+
+    <div class="sig">Construct / Destruct   PROCEDURE()</div>
+    <p class="use">Los llama Clarion, nunca usted.</p>
+    <p><code>Construct</code> pone los valores de fábrica y hace NEW de los tres registros;
+    <code>Destruct</code> mata la rejilla si se le olvidó y los libera. Conviene saber que existen para no
+    liberar dos veces.</p>
+  </div>
+</section>
+
+<section id="m-look">
+  <h2><span class="en">Appearance</span><span class="es">Apariencia</span></h2>
+  <div class="en">
+    <div class="sig">SetFont PROCEDURE(SHORT part, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)</div>
+    <p class="use">One of the four global font slots. This is the normal way to style a grid.</p>
+<pre>Grid.SetFont(<span class="t">PGF:Name</span>,     <span class="s">'Segoe UI'</span>, 9, 0, 0)
+Grid.SetFont(<span class="t">PGF:Value</span>,    <span class="s">'Segoe UI'</span>, 9, 0, 0)
+Grid.SetFont(<span class="t">PGF:Category</span>, <span class="s">'Segoe UI'</span>, 9, 1, 0)   <span class="c">! bold headers</span>
+Grid.SetFont(<span class="t">PGF:Desc</span>,     <span class="s">'Segoe UI'</span>, 8, 0, 1)   <span class="c">! italic description pane</span></pre>
+
+    <div class="sig">SetColor PROCEDURE(SHORT slot, LONG color)</div>
+    <p class="use">One of the eleven colour slots. Clarion colours are <code>0BBGGRRh</code>.</p>
+<pre>Grid.SetColor(<span class="t">PGC:CatBack</span>,   00E4E9F0h)   <span class="c">! reads blue-green-red!</span>
+Grid.SetColor(<span class="t">PGC:CatText</span>,   005F3A1Fh)   <span class="c">! = RGB 1F3A5F, steel blue</span>
+Grid.SetColor(<span class="t">PGC:SelBack</span>,   <span class="k">COLOR:HighLight</span>)
+Grid.SetColor(<span class="t">PGC:ValueText</span>, <span class="k">COLOR:Black</span>)</pre>
+
+    <div class="sig">SetRowHeight PROCEDURE(SHORT px)</div>
+    <p class="use">Pin every row to a height, or 0 to let each size itself.</p>
+<pre>Grid.SetRowHeight(0)             <span class="c">! automatic - a big font makes a tall row</span>
+Grid.SetRowHeight(24)            <span class="c">! uniform 24px, wrapped text clipped to it</span></pre>
+
+    <div class="sig">SetSplitter PROCEDURE(SHORT px)</div>
+    <p class="use">Width of the name column. The user can still drag it afterwards.</p>
+<pre>Grid.SetSplitter(150)</pre>
+
+    <div class="sig">Redraw PROCEDURE()</div>
+    <p class="use">Force a repaint. Once after a batch, not after every call.</p>
+<pre><span class="k">LOOP</span> i = 1 <span class="k">TO</span> 20
+  Grid.SetValue(RowOf[i], <span class="k">CLIP</span>(Values[i]))
+<span class="k">END</span>
+Grid.Redraw()                    <span class="c">! one repaint for all twenty</span></pre>
+  </div>
+  <div class="es">
+    <div class="sig">SetFont PROCEDURE(SHORT part, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0)</div>
+    <p class="use">Una de las cuatro ranuras globales de fuente. Es la forma normal de dar estilo.</p>
+<pre>Grid.SetFont(<span class="t">PGF:Name</span>,     <span class="s">'Segoe UI'</span>, 9, 0, 0)
+Grid.SetFont(<span class="t">PGF:Value</span>,    <span class="s">'Segoe UI'</span>, 9, 0, 0)
+Grid.SetFont(<span class="t">PGF:Category</span>, <span class="s">'Segoe UI'</span>, 9, 1, 0)   <span class="c">! encabezados en negrita</span>
+Grid.SetFont(<span class="t">PGF:Desc</span>,     <span class="s">'Segoe UI'</span>, 8, 0, 1)   <span class="c">! panel de descripción en cursiva</span></pre>
+
+    <div class="sig">SetColor PROCEDURE(SHORT slot, LONG color)</div>
+    <p class="use">Una de las once ranuras de color. Los colores Clarion son <code>0BBGGRRh</code>.</p>
+<pre>Grid.SetColor(<span class="t">PGC:CatBack</span>,   00E4E9F0h)   <span class="c">! ¡se lee azul-verde-rojo!</span>
+Grid.SetColor(<span class="t">PGC:CatText</span>,   005F3A1Fh)   <span class="c">! = RGB 1F3A5F, azul acero</span>
+Grid.SetColor(<span class="t">PGC:SelBack</span>,   <span class="k">COLOR:HighLight</span>)
+Grid.SetColor(<span class="t">PGC:ValueText</span>, <span class="k">COLOR:Black</span>)</pre>
+
+    <div class="sig">SetRowHeight PROCEDURE(SHORT px)</div>
+    <p class="use">Fijar todas las filas a un alto, o 0 para que cada una se dimensione sola.</p>
+<pre>Grid.SetRowHeight(0)             <span class="c">! automático - una fuente grande da una fila alta</span>
+Grid.SetRowHeight(24)            <span class="c">! 24px uniformes, el texto envuelto se recorta</span></pre>
+
+    <div class="sig">SetSplitter PROCEDURE(SHORT px)</div>
+    <p class="use">Ancho de la columna de nombres. El usuario puede arrastrarlo después.</p>
+<pre>Grid.SetSplitter(150)</pre>
+
+    <div class="sig">Redraw PROCEDURE()</div>
+    <p class="use">Forzar un repintado. Una vez tras un lote, no tras cada llamada.</p>
+<pre><span class="k">LOOP</span> i = 1 <span class="k">TO</span> 20
+  Grid.SetValue(RowOf[i], <span class="k">CLIP</span>(Values[i]))
+<span class="k">END</span>
+Grid.Redraw()                    <span class="c">! un repintado para las veinte</span></pre>
+  </div>
+</section>
+
+<section id="m-font">
+  <h2><span class="en">Fonts</span><span class="es">Fuentes</span></h2>
+  <div class="en">
+    <p class="lead">Only for the row or category that has to look different. Ids resolve
+    <b>row &#8594; category &#8594; global slot</b>, and <code>PGF:Inherit</code> (0) means "fall
+    through".</p>
+
+    <div class="sig">AddFont PROCEDURE(STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="use">Register a font, get an id back. Identical fonts return the same id.</p>
+<pre>Fnt = Grid.AddFont(<span class="s">'Consolas'</span>, 10, 0, 0)
+<span class="c">! calling it again with the same four values returns the SAME id,</span>
+<span class="c">! so this is safe and free inside a loop</span></pre>
+
+    <div class="sig">SetCategoryFont PROCEDURE(SIGNED category, SIGNED hdrFont, nameFont, valueFont)</div>
+    <p class="use">Give a whole category its fonts, using ids you registered.</p>
+<pre>Fnt = Grid.AddFont(<span class="s">'Consolas'</span>, 10, 0, 0)
+Grid.SetCategoryFont(Cat, <span class="t">PGF:Inherit</span>, <span class="t">PGF:Inherit</span>, Fnt)  <span class="c">! values only</span></pre>
+
+    <div class="sig">SetRowFont PROCEDURE(SIGNED row, SIGNED nameFont, valueFont)</div>
+    <p class="use">The same for one row, overriding its category.</p>
+<pre>Grid.SetRowFont(Row, <span class="t">PGF:Inherit</span>, Fnt)   <span class="c">! this row's value in Consolas</span></pre>
+
+    <div class="sig">SetRowFontFace PROCEDURE(SIGNED row, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="use">Register and assign in one call. Returns the font id it used.</p>
+<pre>Grid.SetRowFontFace(Row, <span class="t">PGF:Value</span>, <span class="s">'Georgia'</span>, 14, 1, 1)
+Grid.SetRowFontFace(Row, <span class="t">PGF:Name</span>,  <span class="s">'Segoe UI'</span>, 9, 1, 0)  <span class="c">! bold label</span></pre>
+
+    <div class="sig">SetCategoryFontFace PROCEDURE(SIGNED category, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="use">Same, and <code>which</code> may also be <code>PGF:Category</code> for the header.</p>
+<pre>Grid.SetCategoryFontFace(Cat, <span class="t">PGF:Category</span>, <span class="s">'Segoe UI'</span>, 12, 1, 0)</pre>
+
+    <div class="sig">FindCategory PROCEDURE(STRING catName), SIGNED, PROC</div>
+    <p class="use">A category's id by name, 0 if there is none. Never creates one.</p>
+<pre><span class="c">! style a category you did not create yourself - a tab category, say</span>
+Grid.SetCategoryFontFace(Grid.FindCategory(<span class="s">'Postal address'</span>), |
+                         <span class="t">PGF:Value</span>, <span class="s">'Consolas'</span>, 9, 0, 0)</pre>
+
+    <div class="sig">GetRowFont PROCEDURE(SIGNED row, *SIGNED nameFont, *SIGNED valueFont), BYTE, PROC<br>GetCategoryFont PROCEDURE(SIGNED category, *SIGNED hdrFont, *SIGNED nameFont, *SIGNED valueFont), BYTE, PROC</div>
+    <p class="use">Read the ids back. 0 means that part is inheriting.</p>
+<pre>NameF <span class="k">SIGNED</span>
+ValF  <span class="k">SIGNED</span>
+  <span class="k">CODE</span>
+  <span class="k">IF</span> Grid.GetRowFont(Row, NameF, ValF)
+    <span class="k">IF</span> ~ValF <span class="k">THEN</span> <span class="k">MESSAGE</span>(<span class="s">'this row inherits its value font'</span>).
+  <span class="k">END</span></pre>
+
+    <div class="sig">GetFontInfo PROCEDURE(SIGNED fontId, *STRING face, *SIGNED sizePt, *SIGNED bold, *SIGNED italic), BYTE, PROC</div>
+    <p class="use">Turn any id — the four built-in slots included — back into face, size, bold, italic.</p>
+<pre>Face <span class="k">STRING</span>(64)
+Pt   <span class="k">SIGNED</span>
+Bold <span class="k">SIGNED</span>
+Ital <span class="k">SIGNED</span>
+  <span class="k">CODE</span>
+  Grid.GetFontInfo(<span class="t">PGF:Value</span>, Face, Pt, Bold, Ital)
+  <span class="k">MESSAGE</span>(<span class="s">'Value column: '</span> &amp; <span class="k">CLIP</span>(Face) &amp; <span class="s">' '</span> &amp; Pt &amp; <span class="s">'pt'</span>)</pre>
+
+    <div class="sig">FontCount PROCEDURE(), SIGNED</div>
+    <p class="use">The highest valid font id — 4 until you add any.</p>
+<pre><span class="k">LOOP</span> Fnt = 1 <span class="k">TO</span> Grid.FontCount()      <span class="c">! walk every font the grid knows</span>
+  Grid.GetFontInfo(Fnt, Face, Pt, Bold, Ital)
+<span class="k">END</span></pre>
+  </div>
+  <div class="es">
+    <p class="lead">Sólo para la fila o categoría que tiene que verse distinta. Los ids resuelven
+    <b>fila &#8594; categoría &#8594; ranura global</b>, y <code>PGF:Inherit</code> (0) significa
+    "caer".</p>
+
+    <div class="sig">AddFont PROCEDURE(STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="use">Registrar una fuente y obtener un id. Fuentes idénticas devuelven el mismo id.</p>
+<pre>Fnt = Grid.AddFont(<span class="s">'Consolas'</span>, 10, 0, 0)
+<span class="c">! llamarla otra vez con los mismos cuatro valores devuelve el MISMO id,</span>
+<span class="c">! así que dentro de un bucle es seguro y gratis</span></pre>
+
+    <div class="sig">SetCategoryFont PROCEDURE(SIGNED category, SIGNED hdrFont, nameFont, valueFont)</div>
+    <p class="use">Dar sus fuentes a toda una categoría, con ids que usted registró.</p>
+<pre>Fnt = Grid.AddFont(<span class="s">'Consolas'</span>, 10, 0, 0)
+Grid.SetCategoryFont(Cat, <span class="t">PGF:Inherit</span>, <span class="t">PGF:Inherit</span>, Fnt)  <span class="c">! sólo valores</span></pre>
+
+    <div class="sig">SetRowFont PROCEDURE(SIGNED row, SIGNED nameFont, valueFont)</div>
+    <p class="use">Lo mismo para una fila, por encima de su categoría.</p>
+<pre>Grid.SetRowFont(Row, <span class="t">PGF:Inherit</span>, Fnt)   <span class="c">! el valor de esta fila en Consolas</span></pre>
+
+    <div class="sig">SetRowFontFace PROCEDURE(SIGNED row, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="use">Registrar y asignar en una llamada. Devuelve el id de fuente usado.</p>
+<pre>Grid.SetRowFontFace(Row, <span class="t">PGF:Value</span>, <span class="s">'Georgia'</span>, 14, 1, 1)
+Grid.SetRowFontFace(Row, <span class="t">PGF:Name</span>,  <span class="s">'Segoe UI'</span>, 9, 1, 0)  <span class="c">! etiqueta en negrita</span></pre>
+
+    <div class="sig">SetCategoryFontFace PROCEDURE(SIGNED category, SHORT which, STRING face, SHORT sizePt, BYTE bold=0, BYTE italic=0), SIGNED, PROC</div>
+    <p class="use">Igual, y <code>which</code> también puede ser <code>PGF:Category</code> para el
+    encabezado.</p>
+<pre>Grid.SetCategoryFontFace(Cat, <span class="t">PGF:Category</span>, <span class="s">'Segoe UI'</span>, 12, 1, 0)</pre>
+
+    <div class="sig">FindCategory PROCEDURE(STRING catName), SIGNED, PROC</div>
+    <p class="use">El id de una categoría por nombre, 0 si no hay. Nunca crea.</p>
+<pre><span class="c">! dar estilo a una categoría que usted no creó - una de pestaña, por ejemplo</span>
+Grid.SetCategoryFontFace(Grid.FindCategory(<span class="s">'Dirección postal'</span>), |
+                         <span class="t">PGF:Value</span>, <span class="s">'Consolas'</span>, 9, 0, 0)</pre>
+
+    <div class="sig">GetRowFont PROCEDURE(SIGNED row, *SIGNED nameFont, *SIGNED valueFont), BYTE, PROC<br>GetCategoryFont PROCEDURE(SIGNED category, *SIGNED hdrFont, *SIGNED nameFont, *SIGNED valueFont), BYTE, PROC</div>
+    <p class="use">Releer los ids. 0 significa que esa parte hereda.</p>
+<pre>NameF <span class="k">SIGNED</span>
+ValF  <span class="k">SIGNED</span>
+  <span class="k">CODE</span>
+  <span class="k">IF</span> Grid.GetRowFont(Row, NameF, ValF)
+    <span class="k">IF</span> ~ValF <span class="k">THEN</span> <span class="k">MESSAGE</span>(<span class="s">'esta fila hereda su fuente de valor'</span>).
+  <span class="k">END</span></pre>
+
+    <div class="sig">GetFontInfo PROCEDURE(SIGNED fontId, *STRING face, *SIGNED sizePt, *SIGNED bold, *SIGNED italic), BYTE, PROC</div>
+    <p class="use">Convertir cualquier id — incluidas las cuatro ranuras — en cara, tamaño, negrita,
+    cursiva.</p>
+<pre>Face <span class="k">STRING</span>(64)
+Pt   <span class="k">SIGNED</span>
+Bold <span class="k">SIGNED</span>
+Ital <span class="k">SIGNED</span>
+  <span class="k">CODE</span>
+  Grid.GetFontInfo(<span class="t">PGF:Value</span>, Face, Pt, Bold, Ital)
+  <span class="k">MESSAGE</span>(<span class="s">'Columna de valores: '</span> &amp; <span class="k">CLIP</span>(Face) &amp; <span class="s">' '</span> &amp; Pt &amp; <span class="s">'pt'</span>)</pre>
+
+    <div class="sig">FontCount PROCEDURE(), SIGNED</div>
+    <p class="use">El id de fuente válido más alto — 4 hasta que agregue alguna.</p>
+<pre><span class="k">LOOP</span> Fnt = 1 <span class="k">TO</span> Grid.FontCount()      <span class="c">! recorrer todas las fuentes</span>
+  Grid.GetFontInfo(Fnt, Face, Pt, Bold, Ital)
+<span class="k">END</span></pre>
+  </div>
+</section>
+
+<section id="m-wrap">
+  <h2><span class="en">Wrapping &amp; height</span><span class="es">Envoltura y alto</span></h2>
+  <div class="en">
+    <div class="sig">SetRowWrap PROCEDURE(SIGNED row, SIGNED maxLines=-1)</div>
+    <p class="use">Let a value use more than one line. The row grows; the rows below move down.</p>
+<pre>Grid.SetRowWrap(Row, -1)         <span class="c">! as many lines as the text needs</span>
+Grid.SetRowWrap(Row, 3)          <span class="c">! at most three, then clip</span>
+Grid.SetRowWrap(Row, 0)          <span class="c">! back to one line + an ellipsis</span></pre>
+    <div class="callout note"><b>It re-flows on its own.</b> The height depends on the value cell's width,
+      so resizing the window or dragging the splitter re-measures. Rows that do not wrap cost
+      nothing.</div>
+
+    <div class="sig">GetRowWrap PROCEDURE(SIGNED row), SIGNED</div>
+    <p class="use">What the wrap is set to; 0 when off.</p>
+<pre><span class="k">IF</span> ~Grid.GetRowWrap(Row)
+  Grid.SetRowWrap(Row, -1)       <span class="c">! turn it on if it is not already</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">RowHeight PROCEDURE(SIGNED row), SIGNED</div>
+    <p class="use">The laid-out height in pixels; 0 if the row is not visible.</p>
+<pre><span class="k">IF</span> Grid.RowHeight(Row) &gt; 60
+  Grid.SetRowWrap(Row, 2)        <span class="c">! that note got out of hand - cap it</span>
+<span class="k">END</span></pre>
+  </div>
+  <div class="es">
+    <div class="sig">SetRowWrap PROCEDURE(SIGNED row, SIGNED maxLines=-1)</div>
+    <p class="use">Dejar que un valor use más de una línea. La fila crece; las de abajo bajan.</p>
+<pre>Grid.SetRowWrap(Row, -1)         <span class="c">! tantas líneas como pida el texto</span>
+Grid.SetRowWrap(Row, 3)          <span class="c">! como mucho tres, luego recorta</span>
+Grid.SetRowWrap(Row, 0)          <span class="c">! volver a una línea con puntos suspensivos</span></pre>
+    <div class="callout note"><b>Se redistribuye sola.</b> El alto depende del ancho de la celda de valor,
+      así que redimensionar la ventana o arrastrar el divisor vuelve a medir. Las filas que no envuelven no
+      cuestan nada.</div>
+
+    <div class="sig">GetRowWrap PROCEDURE(SIGNED row), SIGNED</div>
+    <p class="use">A cuánto está la envoltura; 0 si está apagada.</p>
+<pre><span class="k">IF</span> ~Grid.GetRowWrap(Row)
+  Grid.SetRowWrap(Row, -1)       <span class="c">! encenderla si no lo estaba</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">RowHeight PROCEDURE(SIGNED row), SIGNED</div>
+    <p class="use">El alto maquetado en píxeles; 0 si la fila no está visible.</p>
+<pre><span class="k">IF</span> Grid.RowHeight(Row) &gt; 60
+  Grid.SetRowWrap(Row, 2)        <span class="c">! esa nota se descontroló - tópela</span>
+<span class="k">END</span></pre>
+  </div>
+</section>
+
+<section id="m-cat">
+  <h2><span class="en">Categories</span><span class="es">Categorías</span></h2>
+  <div class="en">
+    <div class="sig">AddCategory PROCEDURE(STRING catName), SIGNED, PROC</div>
+    <p class="use">A header. <b>Merges by name</b> — asking twice returns the same id.</p>
+<pre>Cat = Grid.AddCategory(<span class="s">'General'</span>)
+<span class="c">! anywhere else, even in another routine:</span>
+Cat = Grid.AddCategory(<span class="s">'General'</span>)   <span class="c">! the SAME header, not a second one</span></pre>
+
+    <div class="sig">ClearAll PROCEDURE()</div>
+    <p class="use">Drop every row and header and start again. Keeps the fonts.</p>
+<pre>Grid.ClearAll()                  <span class="c">! the grid stays alive, the content goes</span>
+Cat = Grid.AddCategory(<span class="s">'General'</span>)   <span class="c">! ids start over from 1</span></pre>
+    <div class="callout warn"><b>Every id you kept is now stale.</b> Re-read them after
+      <code>ClearAll</code> — row 3 is whatever you add third from here on.</div>
+
+    <div class="sig">SetExpanded PROCEDURE(SIGNED category, BYTE expanded=1)</div>
+    <p class="use">Collapse or expand a header. Takes a <b>category</b> id, not a row.</p>
+<pre>Grid.SetExpanded(Cat, 0)         <span class="c">! start collapsed</span>
+Grid.SetExpanded(Grid.FindCategory(<span class="s">'Advanced'</span>), 0)</pre>
+
+    <div class="sig">SetTabCategory PROCEDURE(SIGNED tabFeq, STRING catName)</div>
+    <p class="use">Name the category a TAB's controls will land in. <b>Call before
+    <code>BuildFromWindow</code>.</b></p>
+<pre>Grid.TabCategories = 1
+Grid.SetTabCategory(?TabAddr, <span class="s">'Postal address'</span>)   <span class="c">! instead of the tab's text</span>
+Grid.BuildFromWindow(Cat)</pre>
+
+    <div class="sig">TabCategoryOf PROCEDURE(SIGNED feq), SIGNED, PROC</div>
+    <p class="use">The category of the TAB that holds a control, made on demand. 0 = not on a tab.</p>
+<pre>Cat = Grid.TabCategoryOf(?CUS:DeptCode)
+<span class="k">IF</span> ~Cat <span class="k">THEN</span> Cat = DefaultCat.        <span class="c">! it was not on any tab</span>
+Row = Grid.AddProperty(Cat, <span class="s">'Department'</span>, <span class="t">PGT:Drop</span>, <span class="s">''</span>)</pre>
+  </div>
+  <div class="es">
+    <div class="sig">AddCategory PROCEDURE(STRING catName), SIGNED, PROC</div>
+    <p class="use">Un encabezado. <b>Fusiona por nombre</b> — pedirlo dos veces devuelve el mismo id.</p>
+<pre>Cat = Grid.AddCategory(<span class="s">'General'</span>)
+<span class="c">! en cualquier otro sitio, incluso en otra rutina:</span>
+Cat = Grid.AddCategory(<span class="s">'General'</span>)   <span class="c">! el MISMO encabezado, no un segundo</span></pre>
+
+    <div class="sig">ClearAll PROCEDURE()</div>
+    <p class="use">Quitar todas las filas y encabezados y empezar de nuevo. Conserva las fuentes.</p>
+<pre>Grid.ClearAll()                  <span class="c">! la rejilla sigue viva, el contenido se va</span>
+Cat = Grid.AddCategory(<span class="s">'General'</span>)   <span class="c">! los ids empiezan otra vez en 1</span></pre>
+    <div class="callout warn"><b>Todos los ids que guardó quedan obsoletos.</b> Reléalos tras
+      <code>ClearAll</code> — la fila 3 es la que agregue en tercer lugar de ahora en adelante.</div>
+
+    <div class="sig">SetExpanded PROCEDURE(SIGNED category, BYTE expanded=1)</div>
+    <p class="use">Contraer o expandir un encabezado. Recibe un id de <b>categoría</b>, no de fila.</p>
+<pre>Grid.SetExpanded(Cat, 0)         <span class="c">! empezar contraída</span>
+Grid.SetExpanded(Grid.FindCategory(<span class="s">'Avanzado'</span>), 0)</pre>
+
+    <div class="sig">SetTabCategory PROCEDURE(SIGNED tabFeq, STRING catName)</div>
+    <p class="use">Nombrar la categoría donde caerán los controles de una TAB. <b>Llámelo antes de
+    <code>BuildFromWindow</code>.</b></p>
+<pre>Grid.TabCategories = 1
+Grid.SetTabCategory(?TabAddr, <span class="s">'Dirección postal'</span>)   <span class="c">! en vez del texto de la pestaña</span>
+Grid.BuildFromWindow(Cat)</pre>
+
+    <div class="sig">TabCategoryOf PROCEDURE(SIGNED feq), SIGNED, PROC</div>
+    <p class="use">La categoría de la TAB que contiene un control, creada bajo demanda. 0 = no está en
+    pestaña.</p>
+<pre>Cat = Grid.TabCategoryOf(?CUS:DeptCode)
+<span class="k">IF</span> ~Cat <span class="k">THEN</span> Cat = DefaultCat.        <span class="c">! no estaba en ninguna pestaña</span>
+Row = Grid.AddProperty(Cat, <span class="s">'Departamento'</span>, <span class="t">PGT:Drop</span>, <span class="s">''</span>)</pre>
+  </div>
+</section>
+
+<section id="m-row">
+  <h2><span class="en">Rows</span><span class="es">Filas</span></h2>
+  <div class="en">
+    <div class="sig">AddProperty PROCEDURE(SIGNED category, STRING propName, SHORT propType, STRING value), SIGNED, PROC</div>
+    <p class="use">One row. Returns its id — keep it.</p>
+<pre>Row = Grid.AddProperty(Cat, <span class="s">'Customer name'</span>, <span class="t">PGT:Text</span>,  <span class="k">CLIP</span>(CUS:Name))
+Row = Grid.AddProperty(Cat, <span class="s">'Active'</span>,        <span class="t">PGT:Check</span>, <span class="k">CHOOSE</span>(CUS:Active = 1, <span class="s">'1'</span>, <span class="s">'0'</span>))
+Row = Grid.AddProperty(Cat, <span class="s">'Created'</span>,       <span class="t">PGT:Date</span>,  <span class="k">FORMAT</span>(CUS:Created, @d17))
+Row = Grid.AddProperty(0,   <span class="s">'No category'</span>,   <span class="t">PGT:Text</span>,  <span class="s">''</span>)   <span class="c">! 0 = above the first header</span></pre>
+
+    <div class="sig">SetChoices PROCEDURE(SIGNED row, STRING choices)</div>
+    <p class="use">The list for a <code>PGT:Drop</code> or <code>PGT:Radio</code> row. Pipe separated.</p>
+<pre>Row = Grid.AddProperty(Cat, <span class="s">'Rating'</span>, <span class="t">PGT:Drop</span>, <span class="s">'B'</span>)
+Grid.SetChoices(Row, <span class="s">'A|B|C|D'</span>)
+<span class="c">! build one from a file, and keep a '|' in the data from splitting it:</span>
+Choices = Grid.PipeSafe(DEP:Name) &amp; <span class="s">'|'</span> &amp; Grid.PipeSafe(DEP2:Name)</pre>
+
+    <div class="sig">SetRange PROCEDURE(SIGNED row, REAL low, REAL high, REAL step=1)</div>
+    <p class="use">For <code>PGT:Slider</code> and <code>PGT:Spin</code>.</p>
+<pre>Row = Grid.AddProperty(Cat, <span class="s">'Opacity'</span>, <span class="t">PGT:Slider</span>, <span class="s">'75'</span>)
+Grid.SetRange(Row, 0, 100, 5)    <span class="c">! 0..100 in steps of 5</span>
+Row = Grid.AddProperty(Cat, <span class="s">'Ratio'</span>, <span class="t">PGT:Spin</span>, <span class="s">'0.5'</span>)
+Grid.SetRange(Row, 0, 1, 0.05)   <span class="c">! a fractional step keeps the decimals</span></pre>
+
+    <div class="sig">SetDescription PROCEDURE(SIGNED row, STRING txt)</div>
+    <p class="use">The help text in the bottom pane. Needs <code>PGS:Description</code> in the style.</p>
+<pre>Grid.SetDescription(Row, <span class="s">'The port your SQL listener is on.'</span>)</pre>
+
+    <div class="sig">SetReadOnly PROCEDURE(SIGNED row, BYTE readOnly=1)</div>
+    <p class="use">Grey it and refuse every editor.</p>
+<pre>Grid.SetReadOnly(Row)            <span class="c">! the default argument is 1</span>
+Grid.SetReadOnly(Row, 0)         <span class="c">! and back again</span></pre>
+
+    <div class="sig">SetTag PROCEDURE(SIGNED row, LONG tag)   ·   GetTag PROCEDURE(SIGNED row), LONG</div>
+    <p class="use">A <code>LONG</code> of your own per row. The class stores the source control's field
+    equate here, which is what makes the sync methods work.</p>
+<pre><span class="c">! a grid button row that drives a real button</span>
+Row = Grid.AddProperty(Cat, <span class="s">'OK'</span>, <span class="t">PGT:Button</span>, <span class="s">'OK'</span>)
+Grid.SetTag(Row, ?OkBtn)         <span class="c">! TakeButton POSTs EVENT:Accepted here</span>
+<span class="k">HIDE</span>(?OkBtn)
+<span class="c">! ... and later, to find out which control a row belongs to:</span>
+<span class="k">IF</span> Grid.GetTag(Row) = ?CUS:Name
+  <span class="c">! this row is the customer name entry</span>
+<span class="k">END</span></pre>
+    <div class="callout note"><b>An untagged row is invisible to the sync methods.</b> That is by design:
+      it is how a row bound to a variable rather than a control is skipped by <code>SyncBack</code> and
+      left for you to load and save.</div>
+  </div>
+  <div class="es">
+    <div class="sig">AddProperty PROCEDURE(SIGNED category, STRING propName, SHORT propType, STRING value), SIGNED, PROC</div>
+    <p class="use">Una fila. Devuelve su id — guárdelo.</p>
+<pre>Row = Grid.AddProperty(Cat, <span class="s">'Nombre del cliente'</span>, <span class="t">PGT:Text</span>,  <span class="k">CLIP</span>(CUS:Name))
+Row = Grid.AddProperty(Cat, <span class="s">'Activo'</span>,            <span class="t">PGT:Check</span>, <span class="k">CHOOSE</span>(CUS:Active = 1, <span class="s">'1'</span>, <span class="s">'0'</span>))
+Row = Grid.AddProperty(Cat, <span class="s">'Creado'</span>,            <span class="t">PGT:Date</span>,  <span class="k">FORMAT</span>(CUS:Created, @d17))
+Row = Grid.AddProperty(0,   <span class="s">'Sin categoría'</span>,     <span class="t">PGT:Text</span>,  <span class="s">''</span>)   <span class="c">! 0 = encima del primer encabezado</span></pre>
+
+    <div class="sig">SetChoices PROCEDURE(SIGNED row, STRING choices)</div>
+    <p class="use">La lista de una fila <code>PGT:Drop</code> o <code>PGT:Radio</code>. Separada por
+    pipes.</p>
+<pre>Row = Grid.AddProperty(Cat, <span class="s">'Categoría'</span>, <span class="t">PGT:Drop</span>, <span class="s">'B'</span>)
+Grid.SetChoices(Row, <span class="s">'A|B|C|D'</span>)
+<span class="c">! constrúyala desde un archivo, y evite que un '|' en los datos la parta:</span>
+Choices = Grid.PipeSafe(DEP:Name) &amp; <span class="s">'|'</span> &amp; Grid.PipeSafe(DEP2:Name)</pre>
+
+    <div class="sig">SetRange PROCEDURE(SIGNED row, REAL low, REAL high, REAL step=1)</div>
+    <p class="use">Para <code>PGT:Slider</code> y <code>PGT:Spin</code>.</p>
+<pre>Row = Grid.AddProperty(Cat, <span class="s">'Opacidad'</span>, <span class="t">PGT:Slider</span>, <span class="s">'75'</span>)
+Grid.SetRange(Row, 0, 100, 5)    <span class="c">! 0..100 de 5 en 5</span>
+Row = Grid.AddProperty(Cat, <span class="s">'Ratio'</span>, <span class="t">PGT:Spin</span>, <span class="s">'0.5'</span>)
+Grid.SetRange(Row, 0, 1, 0.05)   <span class="c">! un paso fraccionario conserva los decimales</span></pre>
+
+    <div class="sig">SetDescription PROCEDURE(SIGNED row, STRING txt)</div>
+    <p class="use">El texto de ayuda del panel inferior. Necesita <code>PGS:Description</code> en el
+    estilo.</p>
+<pre>Grid.SetDescription(Row, <span class="s">'El puerto donde escucha su SQL.'</span>)</pre>
+
+    <div class="sig">SetReadOnly PROCEDURE(SIGNED row, BYTE readOnly=1)</div>
+    <p class="use">Ponerla gris y rechazar todos los editores.</p>
+<pre>Grid.SetReadOnly(Row)            <span class="c">! el argumento por defecto es 1</span>
+Grid.SetReadOnly(Row, 0)         <span class="c">! y de vuelta</span></pre>
+
+    <div class="sig">SetTag PROCEDURE(SIGNED row, LONG tag)   ·   GetTag PROCEDURE(SIGNED row), LONG</div>
+    <p class="use">Un <code>LONG</code> suyo por fila. La clase guarda aquí el field equate del control de
+    origen, y eso es lo que hace funcionar los métodos de sincronización.</p>
+<pre><span class="c">! una fila botón que maneja un botón real</span>
+Row = Grid.AddProperty(Cat, <span class="s">'OK'</span>, <span class="t">PGT:Button</span>, <span class="s">'OK'</span>)
+Grid.SetTag(Row, ?OkBtn)         <span class="c">! TakeButton hace POST de EVENT:Accepted aquí</span>
+<span class="k">HIDE</span>(?OkBtn)
+<span class="c">! ... y luego, para saber a qué control pertenece una fila:</span>
+<span class="k">IF</span> Grid.GetTag(Row) = ?CUS:Name
+  <span class="c">! esta fila es la entrada del nombre del cliente</span>
+<span class="k">END</span></pre>
+    <div class="callout note"><b>Una fila sin tag es invisible para los métodos de sincronización.</b> Es a
+      propósito: así una fila ligada a una variable y no a un control es ignorada por
+      <code>SyncBack</code> y queda para que usted la cargue y la guarde.</div>
+  </div>
+</section>
+
+<section id="m-val">
+  <h2><span class="en">Values &amp; finding things</span><span class="es">Valores y búsquedas</span></h2>
+  <div class="en">
+    <div class="sig">SetValue PROCEDURE(SIGNED row, STRING value)</div>
+    <p class="use">Put text in a row. Values always cross as text.</p>
+<pre>Grid.SetValue(Row, <span class="k">CLIP</span>(<span class="k">LEFT</span>(CUS:Name)))                <span class="c">! text</span>
+Grid.SetValue(Row, <span class="k">CHOOSE</span>(CUS:Active = 1, <span class="s">'1'</span>, <span class="s">'0'</span>))    <span class="c">! a checkbox</span>
+Grid.SetValue(Row, <span class="k">FORMAT</span>(CUS:Created, @d17))          <span class="c">! a date row</span></pre>
+
+    <div class="sig">GetValue PROCEDURE(SIGNED row), STRING</div>
+    <p class="use">Read it back. <b>If the row is being edited you get the editor's live text</b>, so
+    reading on OK does not need the user to tab out first.</p>
+<pre>CUS:Name    = <span class="k">CLIP</span>(Grid.GetValue(RowName))
+CUS:Active  = <span class="k">CHOOSE</span>(<span class="k">CLIP</span>(Grid.GetValue(RowActive)) = <span class="s">'1'</span>, 1, 0)
+CUS:Created = <span class="k">DEFORMAT</span>(<span class="k">CLIP</span>(Grid.GetValue(RowCreated)), @d17)</pre>
+
+    <div class="sig">FindRow PROCEDURE(STRING propName), SIGNED</div>
+    <p class="use">A row id by its display name; 0 if there is none.</p>
+<pre>Row = Grid.FindRow(<span class="s">'Customer name'</span>)
+<span class="k">IF</span> Row <span class="k">THEN</span> Grid.SetReadOnly(Row).</pre>
+
+    <div class="sig">GetSelected PROCEDURE(), SIGNED</div>
+    <p class="use">The row the user is on; 0 if none.</p>
+<pre>Row = Grid.GetSelected()
+<span class="k">IF</span> Row
+  ?Status{<span class="t">PROP:Text</span>} = <span class="s">'Editing: '</span> &amp; <span class="k">CLIP</span>(Grid.GetValue(Row))
+<span class="k">END</span></pre>
+
+    <div class="sig">RowCount PROCEDURE(), SIGNED</div>
+    <p class="use">How many rows exist. Ids run 1..count.</p>
+<pre><span class="k">LOOP</span> Row = 1 <span class="k">TO</span> Grid.RowCount()
+  <span class="k">IF</span> Grid.GetTag(Row)                 <span class="c">! only the control-bound ones</span>
+    Grid.SyncRow(Row)
+  <span class="k">END</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">PipeSafe PROCEDURE(STRING txt), STRING</div>
+    <p class="use"><code>CLIP</code> + <code>LEFT</code>, and any <code>|</code> in the data becomes
+    <code>/</code>. Build every pipe-list item with it.</p>
+<pre>Codes = <span class="s">''</span>
+<span class="k">LOOP</span>
+  <span class="k">IF</span> Access:Departments.Next() <span class="k">THEN</span> <span class="k">BREAK</span>.
+  <span class="k">IF</span> Codes = <span class="s">''</span>
+    Codes = Grid.PipeSafe(DEP:Code)
+  <span class="k">ELSE</span>
+    Codes = <span class="k">CLIP</span>(Codes) &amp; <span class="s">'|'</span> &amp; Grid.PipeSafe(DEP:Code)
+  <span class="k">END</span>
+<span class="k">END</span></pre>
+  </div>
+  <div class="es">
+    <div class="sig">SetValue PROCEDURE(SIGNED row, STRING value)</div>
+    <p class="use">Poner texto en una fila. Los valores siempre cruzan como texto.</p>
+<pre>Grid.SetValue(Row, <span class="k">CLIP</span>(<span class="k">LEFT</span>(CUS:Name)))                <span class="c">! texto</span>
+Grid.SetValue(Row, <span class="k">CHOOSE</span>(CUS:Active = 1, <span class="s">'1'</span>, <span class="s">'0'</span>))    <span class="c">! una casilla</span>
+Grid.SetValue(Row, <span class="k">FORMAT</span>(CUS:Created, @d17))          <span class="c">! una fila de fecha</span></pre>
+
+    <div class="sig">GetValue PROCEDURE(SIGNED row), STRING</div>
+    <p class="use">Releerlo. <b>Si la fila se está editando obtiene el texto vivo del editor</b>, así que
+    leer en OK no exige que el usuario salga del campo.</p>
+<pre>CUS:Name    = <span class="k">CLIP</span>(Grid.GetValue(RowName))
+CUS:Active  = <span class="k">CHOOSE</span>(<span class="k">CLIP</span>(Grid.GetValue(RowActive)) = <span class="s">'1'</span>, 1, 0)
+CUS:Created = <span class="k">DEFORMAT</span>(<span class="k">CLIP</span>(Grid.GetValue(RowCreated)), @d17)</pre>
+
+    <div class="sig">FindRow PROCEDURE(STRING propName), SIGNED</div>
+    <p class="use">Un id de fila por su nombre visible; 0 si no hay.</p>
+<pre>Row = Grid.FindRow(<span class="s">'Nombre del cliente'</span>)
+<span class="k">IF</span> Row <span class="k">THEN</span> Grid.SetReadOnly(Row).</pre>
+
+    <div class="sig">GetSelected PROCEDURE(), SIGNED</div>
+    <p class="use">La fila en la que está el usuario; 0 si ninguna.</p>
+<pre>Row = Grid.GetSelected()
+<span class="k">IF</span> Row
+  ?Status{<span class="t">PROP:Text</span>} = <span class="s">'Editando: '</span> &amp; <span class="k">CLIP</span>(Grid.GetValue(Row))
+<span class="k">END</span></pre>
+
+    <div class="sig">RowCount PROCEDURE(), SIGNED</div>
+    <p class="use">Cuántas filas hay. Los ids van de 1 al total.</p>
+<pre><span class="k">LOOP</span> Row = 1 <span class="k">TO</span> Grid.RowCount()
+  <span class="k">IF</span> Grid.GetTag(Row)                 <span class="c">! sólo las ligadas a un control</span>
+    Grid.SyncRow(Row)
+  <span class="k">END</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">PipeSafe PROCEDURE(STRING txt), STRING</div>
+    <p class="use"><code>CLIP</code> + <code>LEFT</code>, y todo <code>|</code> en los datos se vuelve
+    <code>/</code>. Construya con ella cada elemento de una lista con pipes.</p>
+<pre>Codes = <span class="s">''</span>
+<span class="k">LOOP</span>
+  <span class="k">IF</span> Access:Departamentos.Next() <span class="k">THEN</span> <span class="k">BREAK</span>.
+  <span class="k">IF</span> Codes = <span class="s">''</span>
+    Codes = Grid.PipeSafe(DEP:Code)
+  <span class="k">ELSE</span>
+    Codes = <span class="k">CLIP</span>(Codes) &amp; <span class="s">'|'</span> &amp; Grid.PipeSafe(DEP:Code)
+  <span class="k">END</span>
+<span class="k">END</span></pre>
+  </div>
+</section>
+
+<section id="m-form">
+  <h2><span class="en">Form conversion</span><span class="es">Conversión de formulario</span></h2>
+  <div class="en">
+    <div class="sig">BuildFromWindow PROCEDURE(SIGNED category=0, &lt;STRING excludeFeqs&gt;), SIGNED, PROC, VIRTUAL</div>
+    <p class="use">Turn the whole window into rows in one call. Returns how many it made.</p>
+<pre>Excl = <span class="s">''</span>
+Excl = <span class="k">CLIP</span>(Excl) &amp; <span class="s">'|'</span> &amp; ?OkBtn
+Excl = <span class="k">CLIP</span>(Excl) &amp; <span class="s">'|'</span> &amp; ?CancelBtn
+Excl = <span class="k">CLIP</span>(Excl) &amp; <span class="s">'|'</span> &amp; ?TabBrowse    <span class="c">! a TAB feq spares its whole subtree</span>
+Cat = Grid.AddCategory(<span class="s">'Customer'</span>)
+Grid.BuildFromWindow(Cat, <span class="k">CLIP</span>(Excl))</pre>
+    <div class="callout tip"><b>Excluding a container excludes everything in it.</b> One TAB field equate
+      keeps a whole browse tab — list, buttons and all — alive and working next to the grid.</div>
+
+    <div class="sig">AddControl PROCEDURE(SIGNED feq, SIGNED category=0), SIGNED, PROC, VIRTUAL</div>
+    <p class="use">Convert <b>one</b> control by hand. Returns 0 if it has no grid equivalent.</p>
+<pre>Grid.NextPrompt = ?PromptName    <span class="c">! optional: name the row from a PROMPT</span>
+Row = Grid.AddControl(?CUS:Name, Cat)
+<span class="k">IF</span> ~Row <span class="k">THEN</span> <span class="k">MESSAGE</span>(<span class="s">'that control has no grid equivalent'</span>).</pre>
+
+    <div class="sig">AddFileDrop PROCEDURE(SIGNED category, STRING label, SIGNED codeFeq, nameFeq, STRING codes, names, &lt;STRING description&gt;), SIGNED, PROC, VIRTUAL</div>
+    <p class="use">Fold a lookup trio into one drop row that shows the name and stores the code.</p>
+<pre>Codes = <span class="s">'D01|D02|D03'</span>
+Names = <span class="s">'Sales|Support|Warehouse'</span>
+Row = Grid.AddFileDrop(Cat, <span class="s">'Department'</span>, |
+        ?CUS:DeptCode,               |   <span class="c">! hidden, holds the code</span>
+        ?CUS:DeptName,               |   <span class="c">! hidden, shows the name (0 if none)</span>
+        Codes, Names,                |
+        <span class="s">'Which department owns this customer'</span>)
+<span class="k">HIDE</span>(?LookupDept)                     <span class="c">! the '...' button is now redundant</span></pre>
+    <div class="callout warn"><b>Exclude all three controls from <code>BuildFromWindow</code> first</b>,
+      or they get converted into three separate rows before you fold them.</div>
+
+    <div class="sig">TrimTabs PROCEDURE(), VIRTUAL</div>
+    <p class="use">Hide the TABs the conversion emptied, and the SHEET once its last tab goes. <b>Call it
+    last.</b></p>
+<pre>Grid.BuildFromWindow(Cat, <span class="k">CLIP</span>(Excl))
+<span class="c">! ... AddFileDrop for each lookup, which hides its own controls ...</span>
+Grid.TrimTabs()                  <span class="c">! only now is a lookup-only tab actually empty</span></pre>
+  </div>
+  <div class="es">
+    <div class="sig">BuildFromWindow PROCEDURE(SIGNED category=0, &lt;STRING excludeFeqs&gt;), SIGNED, PROC, VIRTUAL</div>
+    <p class="use">Convertir toda la ventana en filas de una llamada. Devuelve cuántas hizo.</p>
+<pre>Excl = <span class="s">''</span>
+Excl = <span class="k">CLIP</span>(Excl) &amp; <span class="s">'|'</span> &amp; ?OkBtn
+Excl = <span class="k">CLIP</span>(Excl) &amp; <span class="s">'|'</span> &amp; ?CancelBtn
+Excl = <span class="k">CLIP</span>(Excl) &amp; <span class="s">'|'</span> &amp; ?TabBrowse    <span class="c">! el feq de una TAB respeta todo su subárbol</span>
+Cat = Grid.AddCategory(<span class="s">'Cliente'</span>)
+Grid.BuildFromWindow(Cat, <span class="k">CLIP</span>(Excl))</pre>
+    <div class="callout tip"><b>Excluir un contenedor excluye todo lo de dentro.</b> Un solo field equate de
+      TAB mantiene viva y funcionando toda una pestaña de browse — lista, botones y todo — junto a la
+      rejilla.</div>
+
+    <div class="sig">AddControl PROCEDURE(SIGNED feq, SIGNED category=0), SIGNED, PROC, VIRTUAL</div>
+    <p class="use">Convertir <b>un</b> control a mano. Devuelve 0 si no tiene equivalente.</p>
+<pre>Grid.NextPrompt = ?PromptName    <span class="c">! opcional: nombrar la fila desde un PROMPT</span>
+Row = Grid.AddControl(?CUS:Name, Cat)
+<span class="k">IF</span> ~Row <span class="k">THEN</span> <span class="k">MESSAGE</span>(<span class="s">'ese control no tiene equivalente'</span>).</pre>
+
+    <div class="sig">AddFileDrop PROCEDURE(SIGNED category, STRING label, SIGNED codeFeq, nameFeq, STRING codes, names, &lt;STRING description&gt;), SIGNED, PROC, VIRTUAL</div>
+    <p class="use">Plegar un trío de búsqueda en una fila desplegable que muestra el nombre y guarda el
+    código.</p>
+<pre>Codes = <span class="s">'D01|D02|D03'</span>
+Names = <span class="s">'Ventas|Soporte|Almacén'</span>
+Row = Grid.AddFileDrop(Cat, <span class="s">'Departamento'</span>, |
+        ?CUS:DeptCode,               |   <span class="c">! oculto, guarda el código</span>
+        ?CUS:DeptName,               |   <span class="c">! oculto, muestra el nombre (0 si no hay)</span>
+        Codes, Names,                |
+        <span class="s">'A qué departamento pertenece'</span>)
+<span class="k">HIDE</span>(?LookupDept)                     <span class="c">! el botón '...' ya sobra</span></pre>
+    <div class="callout warn"><b>Excluya antes los tres controles de <code>BuildFromWindow</code></b>, o se
+      convertirán en tres filas separadas antes de que usted los pliegue.</div>
+
+    <div class="sig">TrimTabs PROCEDURE(), VIRTUAL</div>
+    <p class="use">Ocultar las TAB que vació la conversión, y el SHEET cuando se va su última pestaña.
+    <b>Llámelo al final.</b></p>
+<pre>Grid.BuildFromWindow(Cat, <span class="k">CLIP</span>(Excl))
+<span class="c">! ... AddFileDrop por cada búsqueda, que oculta sus propios controles ...</span>
+Grid.TrimTabs()                  <span class="c">! sólo ahora una pestaña de sólo búsquedas está vacía</span></pre>
+  </div>
+</section>
+
+<section id="m-sync">
+  <h2><span class="en">Syncing</span><span class="es">Sincronización</span></h2>
+  <div class="en">
+    <div class="sig">SyncBack PROCEDURE()</div>
+    <p class="use">Every row &#8594; its control's USE variable. This is the one you call on OK.</p>
+<pre><span class="k">OF</span> ?OkBtn
+  Grid.SyncBack()                <span class="c">! the whole grid, into the form</span>
+  <span class="c">! CUS:Name, CUS:Active ... are now current</span></pre>
+    <div class="callout danger"><b>With <code>LiveSync</code> off, nothing writes back until this runs.</b>
+      If your window has no OK button, either turn <code>LiveSync</code> on or call this yourself.</div>
+
+    <div class="sig">SyncRow PROCEDURE(SIGNED row)</div>
+    <p class="use">One row &#8594; its control. What <code>TakeChanged</code> calls when live sync is on.</p>
+<pre>Grid.SyncRow(Grid.GetSelected()) <span class="c">! push just the row being edited</span></pre>
+
+    <div class="sig">SyncFrom PROCEDURE()</div>
+    <p class="use">The other direction: every control &#8594; its row, then repaint. Call it after anything
+    changes the form behind the grid's back.</p>
+<pre>CUS:DeptCode = <span class="s">'D04'</span>              <span class="c">! your own code changed a USE variable</span>
+Grid.SyncFrom()                  <span class="c">! the grid now shows 'Head office'</span></pre>
+    <div class="callout note"><b>A lookup row round-trips through its code.</b> <code>SyncFrom</code> reads
+      the hidden code control and shows the matching name; <code>SyncBack</code> takes the name the user
+      picked and writes the code. An unknown code is shown raw rather than blanked.</div>
+  </div>
+  <div class="es">
+    <div class="sig">SyncBack PROCEDURE()</div>
+    <p class="use">Cada fila &#8594; la variable USE de su control. Es la que se llama en OK.</p>
+<pre><span class="k">OF</span> ?OkBtn
+  Grid.SyncBack()                <span class="c">! toda la rejilla, al formulario</span>
+  <span class="c">! CUS:Name, CUS:Active ... ya están al día</span></pre>
+    <div class="callout danger"><b>Con <code>LiveSync</code> apagado, nada se escribe hasta que esto
+      corra.</b> Si su ventana no tiene botón OK, encienda <code>LiveSync</code> o llámelo usted.</div>
+
+    <div class="sig">SyncRow PROCEDURE(SIGNED row)</div>
+    <p class="use">Una fila &#8594; su control. Lo que llama <code>TakeChanged</code> con la sincronización
+    viva encendida.</p>
+<pre>Grid.SyncRow(Grid.GetSelected()) <span class="c">! empujar sólo la fila que se edita</span></pre>
+
+    <div class="sig">SyncFrom PROCEDURE()</div>
+    <p class="use">La dirección contraria: cada control &#8594; su fila, y repintar. Llámelo tras cualquier
+    cosa que cambie el formulario a espaldas de la rejilla.</p>
+<pre>CUS:DeptCode = <span class="s">'D04'</span>              <span class="c">! su código cambió una variable USE</span>
+Grid.SyncFrom()                  <span class="c">! la rejilla ya muestra 'Oficina central'</span></pre>
+    <div class="callout note"><b>Una fila de búsqueda va y vuelve por su código.</b> <code>SyncFrom</code>
+      lee el control de código oculto y muestra el nombre correspondiente; <code>SyncBack</code> toma el
+      nombre que eligió el usuario y escribe el código. Un código desconocido se muestra tal cual.</div>
+  </div>
+</section>
+
+<section id="m-event">
+  <h2><span class="en">Events</span><span class="es">Eventos</span></h2>
+  <div class="en">
+    <div class="sig">TakeEvent PROCEDURE(), BYTE, PROC, VIRTUAL</div>
+    <p class="use">The pump. Drains the DLL's queue and dispatches. Returns 1 if it handled anything.</p>
+<pre><span class="k">ACCEPT</span>
+  <span class="k">CASE</span> <span class="k">EVENT</span>()
+  <span class="k">OF</span> <span class="t">EVENT:Timer</span>
+    <span class="k">IF</span> Grid.TakeEvent()
+      <span class="c">! something happened - the Take* methods below already ran</span>
+    <span class="k">END</span>
+  <span class="k">OF</span> <span class="t">EVENT:Sized</span>
+    Grid.Reposition()
+  <span class="k">END</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">TakeChanged PROCEDURE(SIGNED row), VIRTUAL</div>
+    <p class="use">Fires when the user edits a row. Default: <code>SyncRow</code> if
+    <code>LiveSync</code>.</p>
+<pre>MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">PARENT</span>.TakeChanged(row)         <span class="c">! keep LiveSync working</span>
+  <span class="k">IF</span> row = RowUseProxy           <span class="c">! react to one particular row</span>
+    <span class="k">SELF</span>.SetReadOnly(RowProxyHost, <span class="k">CHOOSE</span>(<span class="k">CLIP</span>(<span class="k">SELF</span>.GetValue(row)) = <span class="s">'1'</span>, 0, 1))
+    <span class="k">SELF</span>.Redraw()
+  <span class="k">END</span></pre>
+
+    <div class="sig">TakeButton PROCEDURE(SIGNED row), VIRTUAL</div>
+    <p class="use">Fires when a <code>PGT:Button</code> row is pressed. Default: POST
+    <code>EVENT:Accepted</code> to the tagged control and arm a two-tick refresh.</p>
+<pre>MyGrid.TakeButton <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">IF</span> <span class="k">SELF</span>.GetTag(row)
+    <span class="k">PARENT</span>.TakeButton(row)       <span class="c">! it drives a real control - let it</span>
+  <span class="k">ELSE</span>
+    <span class="k">MESSAGE</span>(<span class="s">'Row '</span> &amp; row &amp; <span class="s">' pressed'</span>)   <span class="c">! a button row of your own</span>
+  <span class="k">END</span></pre>
+
+    <div class="sig">TakeSelect PROCEDURE(SIGNED row), VIRTUAL</div>
+    <p class="use">Fires when the selection moves, and on a double-click. <b>Empty by default</b> — the
+    cheapest hook there is.</p>
+<pre>MyGrid.TakeSelect <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">SETTARGET</span>(<span class="k">SELF</span>.Win)
+  ?Preview{<span class="t">PROP:Text</span>} = <span class="k">CLIP</span>(<span class="k">SELF</span>.GetValue(row))
+  <span class="k">SETTARGET</span>()</pre>
+    <div class="callout tip"><b>Declare the derived class at module scope</b> and implement its methods
+      after the procedure's CODE, exactly as AppGen does for <code>ThisWindow</code>. Then just declare your
+      object as <code>MyGrid</code> instead of <code>PropGridClass</code> — or type the class name into the
+      template's <i>Class name</i> prompt.</div>
+  </div>
+  <div class="es">
+    <div class="sig">TakeEvent PROCEDURE(), BYTE, PROC, VIRTUAL</div>
+    <p class="use">La bomba. Vacía la cola de la DLL y despacha. Devuelve 1 si atendió algo.</p>
+<pre><span class="k">ACCEPT</span>
+  <span class="k">CASE</span> <span class="k">EVENT</span>()
+  <span class="k">OF</span> <span class="t">EVENT:Timer</span>
+    <span class="k">IF</span> Grid.TakeEvent()
+      <span class="c">! pasó algo - los métodos Take* de abajo ya corrieron</span>
+    <span class="k">END</span>
+  <span class="k">OF</span> <span class="t">EVENT:Sized</span>
+    Grid.Reposition()
+  <span class="k">END</span>
+<span class="k">END</span></pre>
+
+    <div class="sig">TakeChanged PROCEDURE(SIGNED row), VIRTUAL</div>
+    <p class="use">Se dispara cuando el usuario edita una fila. Por defecto: <code>SyncRow</code> si
+    <code>LiveSync</code>.</p>
+<pre>MyGrid.TakeChanged <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">PARENT</span>.TakeChanged(row)         <span class="c">! que LiveSync siga funcionando</span>
+  <span class="k">IF</span> row = RowUseProxy           <span class="c">! reaccionar a una fila concreta</span>
+    <span class="k">SELF</span>.SetReadOnly(RowProxyHost, <span class="k">CHOOSE</span>(<span class="k">CLIP</span>(<span class="k">SELF</span>.GetValue(row)) = <span class="s">'1'</span>, 0, 1))
+    <span class="k">SELF</span>.Redraw()
+  <span class="k">END</span></pre>
+
+    <div class="sig">TakeButton PROCEDURE(SIGNED row), VIRTUAL</div>
+    <p class="use">Se dispara al pulsar una fila <code>PGT:Button</code>. Por defecto: POST de
+    <code>EVENT:Accepted</code> al control del tag y armar un refresco de dos ticks.</p>
+<pre>MyGrid.TakeButton <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">IF</span> <span class="k">SELF</span>.GetTag(row)
+    <span class="k">PARENT</span>.TakeButton(row)       <span class="c">! maneja un control real - déjelo</span>
+  <span class="k">ELSE</span>
+    <span class="k">MESSAGE</span>(<span class="s">'Se pulsó la fila '</span> &amp; row)   <span class="c">! una fila botón suya</span>
+  <span class="k">END</span></pre>
+
+    <div class="sig">TakeSelect PROCEDURE(SIGNED row), VIRTUAL</div>
+    <p class="use">Se dispara al moverse la selección, y con doble clic. <b>Vacío por defecto</b> — el
+    gancho más barato que hay.</p>
+<pre>MyGrid.TakeSelect <span class="k">PROCEDURE</span>(<span class="k">SIGNED</span> row)
+  <span class="k">CODE</span>
+  <span class="k">SETTARGET</span>(<span class="k">SELF</span>.Win)
+  ?Preview{<span class="t">PROP:Text</span>} = <span class="k">CLIP</span>(<span class="k">SELF</span>.GetValue(row))
+  <span class="k">SETTARGET</span>()</pre>
+    <div class="callout tip"><b>Declare la clase derivada a nivel de módulo</b> e implemente sus métodos
+      después del CODE del procedimiento, igual que hace AppGen con <code>ThisWindow</code>. Luego declare
+      su objeto como <code>MyGrid</code> en vez de <code>PropGridClass</code> — o escriba el nombre de la
+      clase en el prompt <i>Class name</i> de la plantilla.</div>
+  </div>
+</section>
+
+<section id="index">
+  <h2><span class="en">A–Z index</span><span class="es">Índice A–Z</span></h2>
+  <div class="en">
+    <p class="lead">Every public member, alphabetically, with where it is written up.</p>
+    <table>
+      <tr><th>Member</th><th>Kind</th><th>In</th></tr>
+      <tr><td><code>AddCategory</code></td><td>method</td><td><a href="#m-cat">Categories</a></td></tr>
+      <tr><td><code>AddControl</code></td><td>method, virtual</td><td><a href="#m-form">Form conversion</a></td></tr>
+      <tr><td><code>AddFileDrop</code></td><td>method, virtual</td><td><a href="#m-form">Form conversion</a></td></tr>
+      <tr><td><code>AddFont</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>AddProperty</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>BuildFromWindow</code></td><td>method, virtual</td><td><a href="#m-form">Form conversion</a></td></tr>
+      <tr><td><code>ClearAll</code></td><td>method</td><td><a href="#m-cat">Categories</a></td></tr>
+      <tr><td><code>Construct</code> / <code>Destruct</code></td><td>method</td><td><a href="#m-life">Lifetime</a></td></tr>
+      <tr><td><code>DockMode</code>, <code>DockSize</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>FindCategory</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>FindRow</code></td><td>method</td><td><a href="#m-val">Values</a></td></tr>
+      <tr><td><code>FontCount</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>GetCategoryFont</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>GetFontInfo</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>GetRowFont</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>GetRowWrap</code></td><td>method</td><td><a href="#m-wrap">Wrapping</a></td></tr>
+      <tr><td><code>GetSelected</code></td><td>method</td><td><a href="#m-val">Values</a></td></tr>
+      <tr><td><code>GetTag</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>GetValue</code></td><td>method</td><td><a href="#m-val">Values</a></td></tr>
+      <tr><td><code>HideOriginals</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>Init</code>, <code>InitXY</code></td><td>method, virtual</td><td><a href="#m-life">Lifetime</a></td></tr>
+      <tr><td><code>Initialized</code></td><td>property</td><td><a href="#p-read">Properties you read</a></td></tr>
+      <tr><td><code>Kill</code></td><td>method, virtual</td><td><a href="#m-life">Lifetime</a></td></tr>
+      <tr><td><code>LiveSync</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>MarginX</code>, <code>MarginY</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>MaxScanItems</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>NextPrompt</code></td><td>property</td><td><a href="#p-internal">Internal</a></td></tr>
+      <tr><td><code>PendingSyncFrom</code></td><td>property</td><td><a href="#p-internal">Internal</a></td></tr>
+      <tr><td><code>PG</code></td><td>property</td><td><a href="#p-read">Properties you read</a></td></tr>
+      <tr><td><code>PipeSafe</code></td><td>method</td><td><a href="#m-val">Values</a></td></tr>
+      <tr><td><code>RegionFeq</code></td><td>property</td><td><a href="#p-read">Properties you read</a></td></tr>
+      <tr><td><code>Redraw</code></td><td>method</td><td><a href="#m-look">Appearance</a></td></tr>
+      <tr><td><code>Reposition</code></td><td>method, virtual</td><td><a href="#m-life">Lifetime</a></td></tr>
+      <tr><td><code>RowCount</code></td><td>method</td><td><a href="#m-val">Values</a></td></tr>
+      <tr><td><code>RowHeight</code></td><td>method</td><td><a href="#m-wrap">Wrapping</a></td></tr>
+      <tr><td><code>SetCategoryFont</code>, <code>SetCategoryFontFace</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>SetChoices</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>SetColor</code></td><td>method</td><td><a href="#m-look">Appearance</a></td></tr>
+      <tr><td><code>SetDescription</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>SetDock</code></td><td>method</td><td><a href="#m-life">Lifetime</a></td></tr>
+      <tr><td><code>SetExpanded</code></td><td>method</td><td><a href="#m-cat">Categories</a></td></tr>
+      <tr><td><code>SetFont</code></td><td>method</td><td><a href="#m-look">Appearance</a></td></tr>
+      <tr><td><code>SetPos</code></td><td>method</td><td><a href="#m-life">Lifetime</a></td></tr>
+      <tr><td><code>SetRange</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>SetReadOnly</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>SetRowFont</code>, <code>SetRowFontFace</code></td><td>method</td><td><a href="#m-font">Fonts</a></td></tr>
+      <tr><td><code>SetRowHeight</code></td><td>method</td><td><a href="#m-look">Appearance</a></td></tr>
+      <tr><td><code>SetRowWrap</code></td><td>method</td><td><a href="#m-wrap">Wrapping</a></td></tr>
+      <tr><td><code>SetSplitter</code></td><td>method</td><td><a href="#m-look">Appearance</a></td></tr>
+      <tr><td><code>SetTabCategory</code></td><td>method</td><td><a href="#m-cat">Categories</a></td></tr>
+      <tr><td><code>SetTag</code></td><td>method</td><td><a href="#m-row">Rows</a></td></tr>
+      <tr><td><code>SetValue</code></td><td>method</td><td><a href="#m-val">Values</a></td></tr>
+      <tr><td><code>Style</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>SyncBack</code>, <code>SyncRow</code>, <code>SyncFrom</code></td><td>method</td><td><a href="#m-sync">Syncing</a></td></tr>
+      <tr><td><code>TabCategories</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>TabCategoryOf</code></td><td>method</td><td><a href="#m-cat">Categories</a></td></tr>
+      <tr><td><code>TakeButton</code>, <code>TakeChanged</code>, <code>TakeSelect</code></td><td>method, virtual</td><td><a href="#m-event">Events</a></td></tr>
+      <tr><td><code>TakeEvent</code></td><td>method, virtual</td><td><a href="#m-event">Events</a></td></tr>
+      <tr><td><code>TimerInterval</code></td><td>property</td><td><a href="#p-config">Properties you set</a></td></tr>
+      <tr><td><code>TrimTabs</code></td><td>method, virtual</td><td><a href="#m-form">Form conversion</a></td></tr>
+      <tr><td><code>Win</code></td><td>property</td><td><a href="#p-read">Properties you read</a></td></tr>
+    </table>
+    <h3>See also</h3>
+    <ul>
+      <li><a href="ClaPropGrid-classes.html">ClaPropGrid — class guide</a>: how the class works, the three
+        registries, and the reasoning behind the ordering rules.</li>
+      <li><a href="ClaPropGrid-dll.html">ClaPropGrid — DLL API</a>: the flat C layer underneath, for binding
+        from outside Clarion.</li>
+      <li><code>examples\PropGridDemo</code> — all of this running, in three windows.</li>
+      <li><code>clarion\INSTALL.md</code> — installing, the templates, deployment.</li>
+    </ul>
+  </div>
+  <div class="es">
+    <p class="lead">Cada miembro público, por orden alfabético, y dónde está explicado.</p>
+    <table>
+      <tr><th>Miembro</th><th>Tipo</th><th>En</th></tr>
+      <tr><td><code>AddCategory</code></td><td>método</td><td><a href="#m-cat">Categorías</a></td></tr>
+      <tr><td><code>AddControl</code></td><td>método, virtual</td><td><a href="#m-form">Conversión</a></td></tr>
+      <tr><td><code>AddFileDrop</code></td><td>método, virtual</td><td><a href="#m-form">Conversión</a></td></tr>
+      <tr><td><code>AddFont</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>AddProperty</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>BuildFromWindow</code></td><td>método, virtual</td><td><a href="#m-form">Conversión</a></td></tr>
+      <tr><td><code>ClearAll</code></td><td>método</td><td><a href="#m-cat">Categorías</a></td></tr>
+      <tr><td><code>Construct</code> / <code>Destruct</code></td><td>método</td><td><a href="#m-life">Vida</a></td></tr>
+      <tr><td><code>DockMode</code>, <code>DockSize</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>FindCategory</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>FindRow</code></td><td>método</td><td><a href="#m-val">Valores</a></td></tr>
+      <tr><td><code>FontCount</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>GetCategoryFont</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>GetFontInfo</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>GetRowFont</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>GetRowWrap</code></td><td>método</td><td><a href="#m-wrap">Envoltura</a></td></tr>
+      <tr><td><code>GetSelected</code></td><td>método</td><td><a href="#m-val">Valores</a></td></tr>
+      <tr><td><code>GetTag</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>GetValue</code></td><td>método</td><td><a href="#m-val">Valores</a></td></tr>
+      <tr><td><code>HideOriginals</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>Init</code>, <code>InitXY</code></td><td>método, virtual</td><td><a href="#m-life">Vida</a></td></tr>
+      <tr><td><code>Initialized</code></td><td>propiedad</td><td><a href="#p-read">Las que lee</a></td></tr>
+      <tr><td><code>Kill</code></td><td>método, virtual</td><td><a href="#m-life">Vida</a></td></tr>
+      <tr><td><code>LiveSync</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>MarginX</code>, <code>MarginY</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>MaxScanItems</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>NextPrompt</code></td><td>propiedad</td><td><a href="#p-internal">Internas</a></td></tr>
+      <tr><td><code>PendingSyncFrom</code></td><td>propiedad</td><td><a href="#p-internal">Internas</a></td></tr>
+      <tr><td><code>PG</code></td><td>propiedad</td><td><a href="#p-read">Las que lee</a></td></tr>
+      <tr><td><code>PipeSafe</code></td><td>método</td><td><a href="#m-val">Valores</a></td></tr>
+      <tr><td><code>RegionFeq</code></td><td>propiedad</td><td><a href="#p-read">Las que lee</a></td></tr>
+      <tr><td><code>Redraw</code></td><td>método</td><td><a href="#m-look">Apariencia</a></td></tr>
+      <tr><td><code>Reposition</code></td><td>método, virtual</td><td><a href="#m-life">Vida</a></td></tr>
+      <tr><td><code>RowCount</code></td><td>método</td><td><a href="#m-val">Valores</a></td></tr>
+      <tr><td><code>RowHeight</code></td><td>método</td><td><a href="#m-wrap">Envoltura</a></td></tr>
+      <tr><td><code>SetCategoryFont</code>, <code>SetCategoryFontFace</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>SetChoices</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>SetColor</code></td><td>método</td><td><a href="#m-look">Apariencia</a></td></tr>
+      <tr><td><code>SetDescription</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>SetDock</code></td><td>método</td><td><a href="#m-life">Vida</a></td></tr>
+      <tr><td><code>SetExpanded</code></td><td>método</td><td><a href="#m-cat">Categorías</a></td></tr>
+      <tr><td><code>SetFont</code></td><td>método</td><td><a href="#m-look">Apariencia</a></td></tr>
+      <tr><td><code>SetPos</code></td><td>método</td><td><a href="#m-life">Vida</a></td></tr>
+      <tr><td><code>SetRange</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>SetReadOnly</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>SetRowFont</code>, <code>SetRowFontFace</code></td><td>método</td><td><a href="#m-font">Fuentes</a></td></tr>
+      <tr><td><code>SetRowHeight</code></td><td>método</td><td><a href="#m-look">Apariencia</a></td></tr>
+      <tr><td><code>SetRowWrap</code></td><td>método</td><td><a href="#m-wrap">Envoltura</a></td></tr>
+      <tr><td><code>SetSplitter</code></td><td>método</td><td><a href="#m-look">Apariencia</a></td></tr>
+      <tr><td><code>SetTabCategory</code></td><td>método</td><td><a href="#m-cat">Categorías</a></td></tr>
+      <tr><td><code>SetTag</code></td><td>método</td><td><a href="#m-row">Filas</a></td></tr>
+      <tr><td><code>SetValue</code></td><td>método</td><td><a href="#m-val">Valores</a></td></tr>
+      <tr><td><code>Style</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>SyncBack</code>, <code>SyncRow</code>, <code>SyncFrom</code></td><td>método</td><td><a href="#m-sync">Sincronización</a></td></tr>
+      <tr><td><code>TabCategories</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>TabCategoryOf</code></td><td>método</td><td><a href="#m-cat">Categorías</a></td></tr>
+      <tr><td><code>TakeButton</code>, <code>TakeChanged</code>, <code>TakeSelect</code></td><td>método, virtual</td><td><a href="#m-event">Eventos</a></td></tr>
+      <tr><td><code>TakeEvent</code></td><td>método, virtual</td><td><a href="#m-event">Eventos</a></td></tr>
+      <tr><td><code>TimerInterval</code></td><td>propiedad</td><td><a href="#p-config">Las que fija</a></td></tr>
+      <tr><td><code>TrimTabs</code></td><td>método, virtual</td><td><a href="#m-form">Conversión</a></td></tr>
+      <tr><td><code>Win</code></td><td>propiedad</td><td><a href="#p-read">Las que lee</a></td></tr>
+    </table>
+    <h3>Vea también</h3>
+    <ul>
+      <li><a href="ClaPropGrid-classes.html">ClaPropGrid — guía de la clase</a>: cómo funciona la clase, los
+        tres registros y el porqué de las reglas de orden.</li>
+      <li><a href="ClaPropGrid-dll.html">ClaPropGrid — API de la DLL</a>: la capa C plana de debajo, para
+        enlazar desde fuera de Clarion.</li>
+      <li><code>examples\PropGridDemo</code> — todo esto funcionando, en tres ventanas.</li>
+      <li><code>clarion\INSTALL.md</code> — instalación, plantillas, despliegue.</li>
+    </ul>
+  </div>
+</section>
+
+    </div>
+    <footer>
+      <span class="en">ClaPropGrid v1.2 · cookbook · every member of PropGridClass with code</span>
+      <span class="es">ClaPropGrid v1.2 · recetario · cada miembro de PropGridClass con código</span>
+    </footer>
+  </main>
+</div>
+<script>
+  function setLang(l){
+    document.documentElement.setAttribute('data-lang', l);
+    document.getElementById('btn-en').classList.toggle('on', l==='en');
+    document.getElementById('btn-es').classList.toggle('on', l==='es');
+    try{ localStorage.setItem('cpg-lang', l); }catch(e){}
+  }
+  var saved='en';
+  try{ saved = localStorage.getItem('cpg-lang') || (navigator.language||'en').slice(0,2); }catch(e){}
+  setLang(saved==='es' ? 'es' : 'en');
+</script>
+</body>
+</html>
