@@ -167,4 +167,4 @@ built with `PG.PipeSafe()` so a `'|'` in the data cannot split them):
 
 ## License / status
 
-Internal tool. Engine, wrapper and templates generated 2026-08-16.
+Released under the [MIT License](LICENSE). Engine, wrapper and templates generated 2026-08-16.
